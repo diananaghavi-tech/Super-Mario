@@ -134,7 +134,7 @@
     color: #fff;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     animation: pop 0.25s ease-out;
-    max-width: 90%;
+    max-width: min(90%, 560px);
   }
   @keyframes pop {
     from { transform: scale(0.85); opacity: 0; }
@@ -169,6 +169,7 @@
     color: #fff;
     margin: 0 2px;
   }
+  body.reduce-motion .card { animation: none; }
   .card .big {
     font-size: 20px;
     margin-top: 4px;
@@ -178,6 +179,18 @@
     color: var(--gold);
     opacity: 0.95;
   }
+  .restartBtn {
+    margin-top: 12px;
+    background: var(--gold);
+    color: #201400;
+    border: none;
+    font-weight: bold;
+    font-size: 15px;
+    padding: 8px 22px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .restartBtn:hover { filter: brightness(1.08); }
   #controls {
     color: #fff;
     text-shadow: 1px 1px 0 #000;
@@ -201,7 +214,8 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    min-width: 200px;
+    width: 200px;
+    max-width: calc(100vw - 20px);
   }
   #settingsPanel[hidden] { display: none; }
   #settingsPanel label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
@@ -290,6 +304,7 @@
     <div id="settingsPanel" role="dialog" aria-label="Settings" hidden>
       <label><input type="checkbox" id="optReducedMotion"> Reduce motion</label>
       <label><input type="checkbox" id="optTouch"> Show touch controls</label>
+      <label>Volume <input type="range" id="optVolume" min="0" max="100" value="80" aria-label="Volume"></label>
       <button id="closeSettingsBtn" type="button">Close</button>
     </div>
     <div id="touchControls" hidden>
@@ -319,6 +334,7 @@
         <h1 id="msgTitle">GAME OVER</h1>
         <p id="msgBody"></p>
         <p class="big">Press <span class="kbd">R</span> to restart</p>
+        <button id="restartBtn" class="restartBtn" type="button">Restart</button>
       </div>
     </div>
   </div>
@@ -346,7 +362,9 @@ const settingsBtn = document.getElementById('settingsBtn');
 const settingsPanel = document.getElementById('settingsPanel');
 const optReducedMotion = document.getElementById('optReducedMotion');
 const optTouch = document.getElementById('optTouch');
+const optVolume = document.getElementById('optVolume');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+const restartBtn = document.getElementById('restartBtn');
 const touchControls = document.getElementById('touchControls');
 const btnLeft = document.getElementById('btnLeft');
 const btnRight = document.getElementById('btnRight');
@@ -364,6 +382,7 @@ function isTouchDevice() {
 function loadSettings() {
   const s = {
     muted: false,
+    volume: 0.8,
     reducedMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
     showTouch: isTouchDevice(),
   };
@@ -398,21 +417,30 @@ function applySettingsToUI() {
   muteBtn.setAttribute('aria-pressed', String(settings.muted));
   optReducedMotion.checked = settings.reducedMotion;
   optTouch.checked = settings.showTouch;
+  optVolume.value = String(Math.round(settings.volume * 100));
   touchControls.hidden = !settings.showTouch;
+  document.body.classList.toggle('reduce-motion', settings.reducedMotion);
+  if (masterGain) masterGain.gain.value = settings.volume;
 }
 
 // ===== Audio: procedural WebAudio synth SFX + a light music loop.       =====
 // ===== No external asset files, so it can't break the single-file deploy. =====
 let audioCtx = null;
+let masterGain = null;
 function ensureAudio() {
   if (!audioCtx) {
-    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = settings.volume;
+      masterGain.connect(audioCtx.destination);
+    } catch (e) { audioCtx = null; masterGain = null; }
   } else if (audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
 }
 function tone(freq, duration, type, startGain, glideTo) {
-  if (!audioCtx || settings.muted) return;
+  if (!audioCtx || !masterGain || settings.muted) return;
   const t0 = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
@@ -421,7 +449,7 @@ function tone(freq, duration, type, startGain, glideTo) {
   if (glideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(glideTo, 1), t0 + duration);
   gain.gain.setValueAtTime(startGain != null ? startGain : 0.15, t0);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-  osc.connect(gain).connect(audioCtx.destination);
+  osc.connect(gain).connect(masterGain);
   osc.start(t0);
   osc.stop(t0 + duration + 0.02);
 }
@@ -437,12 +465,14 @@ const SFX = {
   gameOver: () => { [330, 290, 240, 180].forEach((f, i) => setTimeout(() => tone(f, 0.3, 'sawtooth', 0.16), i * 180)); },
   win: () => { [660, 880, 990, 1320].forEach((f, i) => setTimeout(() => tone(f, 0.22, 'triangle', 0.16), i * 140)); },
 };
-const MUSIC_NOTES = [392, 440, 494, 440, 523, 494, 440, 392];
+const MUSIC_MELODY = [392, 440, 494, 440, 523, 587, 523, 494, 440, 392, 349, 392, 440, 494, 440, 392];
+const MUSIC_BASS   = [196, 196, 247, 247, 262, 262, 247, 247, 220, 220, 196, 196, 175, 175, 196, 196];
 let musicTimer = null;
 let musicStep = 0;
 function scheduleMusicStep() {
   if (!audioCtx || settings.muted || gameState !== 'playing') return;
-  tone(MUSIC_NOTES[musicStep % MUSIC_NOTES.length], 0.25, 'sine', 0.045, null);
+  tone(MUSIC_MELODY[musicStep % MUSIC_MELODY.length], 0.22, 'triangle', 0.05, null);
+  tone(MUSIC_BASS[musicStep % MUSIC_BASS.length], 0.28, 'sine', 0.04, null);
   musicStep++;
 }
 function startMusic() {
@@ -499,7 +529,7 @@ const WALK_SPEED = 4;
 const RUN_SPEED = 7.5;
 const JUMP_FORCE = -12.5;
 const DOUBLE_JUMP_FORCE = -10.5;
-const STOMP_OVERLAP_PX = 14;   // how much the player's feet must be above an enemy's top to count as a stomp, not a side hit
+const STOMP_OVERLAP_PX = 14;   // leniency (px) when checking if the player's feet were above an enemy's top before this frame's move, to count as a stomp rather than a side hit
 const STOMP_BOUNCE = 0.55;     // upward bounce (relative to JUMP_FORCE) after a successful stomp
 const INVULN_FRAMES = 90;      // brief invulnerability window after taking damage
 const KNOCKBACK_VX = 6;
@@ -535,6 +565,7 @@ window.addEventListener('keydown', e => {
   if (key === 'escape' && !settingsPanel.hidden) {
     settingsPanel.hidden = true;
     settingsBtn.setAttribute('aria-expanded', 'false');
+    settingsBtn.focus();
   }
 
   if (gameState === 'title' && key !== 'r') {
@@ -580,20 +611,29 @@ settingsBtn.addEventListener('click', () => {
   const willOpen = settingsPanel.hidden;
   settingsPanel.hidden = !willOpen;
   settingsBtn.setAttribute('aria-expanded', String(willOpen));
+  if (willOpen) optReducedMotion.focus();
 });
 closeSettingsBtn.addEventListener('click', () => {
   settingsPanel.hidden = true;
   settingsBtn.setAttribute('aria-expanded', 'false');
+  settingsBtn.focus();
 });
 optReducedMotion.addEventListener('change', () => {
   settings.reducedMotion = optReducedMotion.checked;
   saveSettings();
+  applySettingsToUI();
 });
 optTouch.addEventListener('change', () => {
   settings.showTouch = optTouch.checked;
   saveSettings();
   applySettingsToUI();
 });
+optVolume.addEventListener('input', () => {
+  settings.volume = Number(optVolume.value) / 100;
+  saveSettings();
+  if (masterGain) masterGain.gain.value = settings.volume;
+});
+restartBtn.addEventListener('click', () => restart());
 
 // ===== Touch controls: reuse the same `keys` map the keyboard uses =====
 function bindHold(el, keyName) {
@@ -662,8 +702,8 @@ starTotalEl.textContent = stars.length;
 // Mushrooms: grow the player and grant one hit of protection against enemies
 let mushrooms = [
   { x: 190, y: GROUND_Y - 20, taken: false },
-  { x: 950, y: GROUND_Y - 20, taken: false },
-  { x: 1420, y: 270, taken: false },
+  { x: 1080, y: GROUND_Y - 20, taken: false },
+  { x: 1550, y: 270, taken: false },
   { x: 2000, y: GROUND_Y - 20, taken: false },
 ];
 
@@ -705,6 +745,7 @@ function createPlayer() {
     x: spawnPoint.x, y: spawnPoint.y, w: PLAYER_SMALL.w, h: PLAYER_SMALL.h,
     vx: 0, vy: 0,
     onGround: false,
+    ridingPlatform: null,
     facing: 1,
     starsCollected: 0,
     lives: 3,
@@ -763,33 +804,40 @@ function spawnBurst(x, y, color) {
   }
 }
 
-function updateParticles() {
+function updateParticles(dt) {
   for (const p of particles) {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += 0.1;
-    p.life -= 0.03;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 0.1 * dt;
+    p.life -= 0.03 * dt;
   }
   particles = particles.filter(p => p.life > 0);
 }
 
-function updateMovingPlatforms() {
+function updateMovingPlatforms(dt) {
   for (const p of platforms) {
     if (!p.moving) continue;
     if (p.axis === 'y') {
-      p.y += p.dir * p.speed;
+      const prevPY = p.y;
+      p.y += p.dir * p.speed * dt;
       if (p.y <= p.min) { p.y = p.min; p.dir = 1; }
       if (p.y >= p.max) { p.y = p.max; p.dir = -1; }
+      // Carry whatever is standing on this platform along with it - without this,
+      // a platform moving up faster than gravity pulls the player down "outruns"
+      // the landing check and the rider falls straight through it.
+      if (player.ridingPlatform === p) {
+        player.y += (p.y - prevPY);
+      }
     }
   }
 }
 
-function update() {
-  if (gameState !== 'playing') { updateParticles(); return; }
+function update(dt) {
+  if (gameState !== 'playing') { updateParticles(dt); return; }
   lifeLostThisFrame = false;
   const t = Date.now();
 
-  updateMovingPlatforms();
+  updateMovingPlatforms(dt);
 
   const running = keys['shift'];
   const maxSpeed = running ? RUN_SPEED : WALK_SPEED;
@@ -797,19 +845,19 @@ function update() {
   // Horizontal input
   let moving = false;
   if (keys['arrowleft'] || keys['a']) {
-    player.vx -= running ? 1.6 : 1;
+    player.vx -= (running ? 1.6 : 1) * dt;
     player.facing = -1;
     moving = true;
   }
   if (keys['arrowright'] || keys['d']) {
-    player.vx += running ? 1.6 : 1;
+    player.vx += (running ? 1.6 : 1) * dt;
     player.facing = 1;
     moving = true;
   }
-  player.vx *= FRICTION;
+  player.vx *= Math.pow(FRICTION, dt);
   if (Math.abs(player.vx) > maxSpeed) player.vx = maxSpeed * Math.sign(player.vx);
 
-  if (moving && player.onGround) player.walkPhase += running ? 0.55 : 0.35;
+  if (moving && player.onGround) player.walkPhase += (running ? 0.55 : 0.35) * dt;
 
   // Jump / double jump (edge-triggered so holding the key doesn't chain-jump).
   // `jumpsUsed` counts jumps taken since the player last stood on ground: the
@@ -831,13 +879,13 @@ function update() {
       player.vy = DOUBLE_JUMP_FORCE;
       player.jumpsUsed = 2;
       SFX.doubleJump();
-      spawnBurst(player.x - camX + player.w / 2, player.y + player.h / 2, '255, 255, 255');
+      spawnBurst(player.x + player.w / 2, player.y + player.h / 2, '255, 255, 255');
     }
   }
   jumpKeyWasDown = jumpPressed;
 
   // Gravity
-  player.vy += GRAVITY;
+  player.vy += GRAVITY * dt;
   if (player.vy > 15) player.vy = 15;
 
   // Move horizontally then resolve collisions based on which side the player
@@ -845,7 +893,7 @@ function update() {
   // left larger overlaps unresolved and risked tunneling).
   const prevX = player.x;
   const prevY = player.y;
-  player.x += player.vx;
+  player.x += player.vx * dt;
   for (const p of platforms) {
     if (rectsOverlap(player, p)) {
       const wasLeftOf = prevX + player.w <= p.x;
@@ -857,7 +905,8 @@ function update() {
 
   // Move vertically then resolve collisions the same way.
   player.onGround = false;
-  player.y += player.vy;
+  player.ridingPlatform = null;
+  player.y += player.vy * dt;
   for (const p of platforms) {
     if (rectsOverlap(player, p)) {
       const wasAbove = prevY + player.h <= p.y;
@@ -867,6 +916,7 @@ function update() {
         player.vy = 0;
         player.onGround = true;
         player.jumpsUsed = 0;
+        player.ridingPlatform = p.moving ? p : null;
       } else if (player.vy < 0 && wasBelow) {
         player.y = p.y + p.h;
         player.vy = 0;
@@ -892,7 +942,7 @@ function update() {
         s.taken = true;
         player.starsCollected++;
         starCountEl.textContent = player.starsCollected;
-        spawnBurst(s.x - camX, s.y, '255, 215, 0');
+        spawnBurst(s.x, s.y, '255, 215, 0');
         SFX.star();
         announce('Star collected: ' + player.starsCollected + ' of ' + stars.length + '.');
       }
@@ -906,7 +956,7 @@ function update() {
       if (rectsOverlap(player, mBox)) {
         m.taken = true;
         growPlayer(player);
-        spawnBurst(m.x - camX, m.y, '220, 60, 60');
+        spawnBurst(m.x, m.y, '220, 60, 60');
         SFX.mushroom();
         announce('Power mushroom collected! You grew bigger.');
       }
@@ -924,12 +974,12 @@ function update() {
     }
   }
 
-  if (player.invuln > 0) player.invuln--;
+  if (player.invuln > 0) player.invuln -= dt;
 
   // Enemies: patrol, get stomped from above, or damage the player on contact
   for (const en of enemies) {
     if (!en.alive) continue;
-    en.x += en.vx;
+    en.x += en.vx * dt;
     if (en.x < en.minX) { en.x = en.minX; en.vx = Math.abs(en.vx); }
     if (en.x + en.w > en.maxX) { en.x = en.maxX - en.w; en.vx = -Math.abs(en.vx); }
     if (en.type === 'flyer') {
@@ -937,11 +987,15 @@ function update() {
     }
 
     if (rectsOverlap(player, en)) {
-      const stomping = player.vy > 0 && (player.y + player.h - en.y) < STOMP_OVERLAP_PX;
+      // Based on the player's position *before* this frame's move (like the
+      // platform collision above) rather than how deep the overlap ended up,
+      // so a fast fall can't "outrun" the stomp check and get misclassified
+      // as a side hit.
+      const stomping = player.vy > 0 && (prevY + player.h <= en.y + STOMP_OVERLAP_PX);
       if (stomping) {
         en.alive = false;
         player.vy = JUMP_FORCE * STOMP_BOUNCE;
-        spawnBurst(en.x - camX + en.w / 2, en.y, '150, 100, 60');
+        spawnBurst(en.x + en.w / 2, en.y, '150, 100, 60');
         SFX.stomp();
       } else if (!lifeLostThisFrame && player.invuln <= 0) {
         if (player.big) {
@@ -971,7 +1025,7 @@ function update() {
   if (camX < 0) camX = 0;
   if (camX > WORLD_WIDTH - canvas.width) camX = WORLD_WIDTH - canvas.width;
 
-  updateParticles();
+  updateParticles(dt);
 }
 
 function loseLife() {
@@ -982,6 +1036,7 @@ function loseLife() {
     gameState = 'dead';
     stopTimer();
     stopMusic();
+    hideToast();
     SFX.gameOver();
     showMessage('GAME OVER', 'You ran out of lives. Stars collected: ' + player.starsCollected + '/' + stars.length + ' · Time: ' + formatTime(elapsedMs));
     announce('Game over. You ran out of lives.');
@@ -998,6 +1053,7 @@ function winGame() {
   gameState = 'won';
   stopTimer();
   stopMusic();
+  hideToast();
   const rating = ratingForStars(player.starsCollected, stars.length);
   const isNew = saveBestIfBetter(player.starsCollected, elapsedMs);
   showMessage(rating.emoji + ' ' + rating.label,
@@ -1314,7 +1370,7 @@ function drawParticles() {
   for (const p of particles) {
     ctx.fillStyle = `rgba(${p.color}, ${Math.max(p.life, 0)})`;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.arc(p.x - camX, p.y, 3, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -1425,14 +1481,14 @@ function drawGoalFlag() {
 function drawPlayer() {
   const drawX = player.x - camX;
   const drawY = player.y;
-  const squash = Math.max(-0.25, Math.min(0.25, player.vy / 30));
+  const squash = settings.reducedMotion ? 0 : Math.max(-0.25, Math.min(0.25, player.vy / 30));
   ctx.save();
   ctx.translate(drawX + player.w / 2, drawY + player.h / 2);
   ctx.scale(player.facing * (1 - squash * 0.3), 1 + squash * 0.3);
 
   const legSwing = player.onGround ? Math.sin(player.walkPhase) * 6 : 0;
   const w = player.w, h = player.h;
-  const scarfWave = Math.sin(Date.now() / 150) * 5 + player.vx * 1.5;
+  const scarfWave = settings.reducedMotion ? 0 : Math.sin(Date.now() / 150) * 5 + player.vx * 1.5;
 
   // trailing scarf, behind the body
   ctx.fillStyle = '#e0a940';
@@ -1539,15 +1595,26 @@ function draw() {
   updateProgressBar();
 }
 
-function loop() {
-  update();
+// dt is normalized so 1.0 == a nominal 60fps frame - every physics constant
+// above was tuned assuming that, so gameplay speed stays the same at 60fps
+// and scales correctly on faster/slower displays instead of running the
+// game itself faster or slower than real time.
+let lastFrameTime = null;
+function loop(now) {
+  let dt = 1;
+  if (lastFrameTime != null) {
+    dt = (now - lastFrameTime) / (1000 / 60);
+    dt = Math.max(0.1, Math.min(dt, 3));
+  }
+  lastFrameTime = now;
+  update(dt);
   draw();
   requestAnimationFrame(loop);
 }
 
 applySettingsToUI();
 refreshBestLine();
-loop();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
