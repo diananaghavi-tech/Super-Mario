@@ -4,6 +4,9 @@ export const keys = {};
 // callbacks so this module doesn't need to know about game.js internals.
 export function initInput({ getState, onStart, onRestart }) {
   window.addEventListener('keydown', e => {
+    // Don't hijack keystrokes typed into the score-entry name field.
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
     keys[e.key.toLowerCase()] = true;
     if (e.key === ' ') e.preventDefault();
 

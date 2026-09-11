@@ -6,6 +6,7 @@ import { createPlayer, resetPlayerPosition, growPlayer, shrinkPlayer } from './p
 import { spawnBurst, updateParticles, drawParticles, clearParticles } from './particles.js';
 import { keys, initInput, initCanvasClick } from './input.js';
 import { setStarTotal, setStarCount, setLives, hideTitleOverlay, showMessage, hideMessage } from './hud.js';
+import { showScoreEntry } from './leaderboardUI.js';
 import { drawSky, drawSun, drawBirds, drawMountains, drawBackgroundHills, drawBackgroundPipes, drawCastle } from './render/background.js';
 import { drawPlatforms, drawStar, drawMushroom, drawGoalFlag, drawHUDVignette } from './render/world.js';
 import { drawEnemies } from './render/enemies.js';
@@ -191,6 +192,7 @@ function loseLife() {
   if (player.lives <= 0) {
     gameState = 'dead';
     showMessage('GAME OVER', 'You ran out of lives. Stars collected: ' + player.starsCollected + '/' + stars.length);
+    showScoreEntry(player.starsCollected);
   } else {
     resetPlayerPosition(player);
     shrinkPlayer(player);
@@ -201,6 +203,7 @@ function loseLife() {
 function winGame() {
   gameState = 'won';
   showMessage('YOU WIN!', 'You reached the flag with ' + player.starsCollected + '/' + stars.length + ' stars.');
+  showScoreEntry(player.starsCollected);
 }
 
 function restart() {

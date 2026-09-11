@@ -115,6 +115,62 @@ canvas {
   font-size: 20px;
   margin-top: 4px;
 }
+.score-form {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 14px 0 4px;
+}
+.score-form input {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  width: 140px;
+}
+.score-form input::placeholder { color: rgba(255,255,255,0.5); }
+.score-form button {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: var(--gold);
+  color: #402a13;
+  font-weight: bold;
+  cursor: pointer;
+}
+.score-form button:disabled { opacity: 0.6; cursor: default; }
+.score-status {
+  min-height: 1.2em;
+  font-size: 13px;
+  opacity: 0.85;
+  margin: 0 0 4px;
+}
+.leaderboard {
+  margin: 10px 0;
+  text-align: left;
+  display: inline-block;
+}
+.leaderboard h2 {
+  font-size: 14px;
+  text-align: center;
+  margin: 0 0 6px;
+  color: var(--gold);
+  letter-spacing: 0.5px;
+}
+.leaderboard ol {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.leaderboard li { margin: 2px 0; }
+
 #controls {
   color: #fff;
   text-shadow: 1px 1px 0 #000;

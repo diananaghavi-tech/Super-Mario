@@ -29,6 +29,15 @@
       <div class="card">
         <h1 id="msgTitle">GAME OVER</h1>
         <p id="msgBody"></p>
+        <form id="scoreForm" class="score-form">
+          <input id="playerNameInput" type="text" maxlength="20" placeholder="Your name" autocomplete="off" required>
+          <button type="submit">Save Score</button>
+        </form>
+        <p id="scoreStatus" class="score-status"></p>
+        <div class="leaderboard">
+          <h2>Top Scores</h2>
+          <ol id="leaderboardList"></ol>
+        </div>
         <p class="big">Press <span class="kbd">R</span> to restart</p>
       </div>
     </div>

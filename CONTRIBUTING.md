@@ -17,9 +17,14 @@ src/particles.js      particle burst effects
 src/input.js          keyboard/click handling
 src/hud.js            DOM/score/overlay updates
 src/render/*.js       drawing: background, world, player, enemies
+src/leaderboard.js    Supabase REST calls (submit/fetch scores)
+src/leaderboardUI.js  wires the name-entry form + score list to leaderboard.js
+src/supabaseConfig.js placeholder Supabase URL/key (filled in at deploy time)
 src/game.js           orchestrates update()/draw()/game state - the one file
                        that touches most of the others
 src/main.js           entry point
+supabase/schema.sql   table, RLS policies, and submit_score() function - run
+                       this in the Supabase SQL editor when it changes
 ```
 
 ## Guidelines for low-conflict parallel work
