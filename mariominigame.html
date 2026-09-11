@@ -2,15 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>The Little Prince - Collect the Stars</title>
+<title>The Little Prince - Collect the Stars (3D)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<script src="vendor/three.min.js"></script>
 <style>
   :root {
-    --panel-bg: rgba(10, 20, 40, 0.55);
-    --panel-border: rgba(255, 255, 255, 0.18);
-    --gold: #ffd700;
+    --panel-bg: rgba(40, 26, 14, 0.55);
+    --panel-border: rgba(255, 214, 150, 0.25);
+    --gold: #ffd76a;
     --accent: #ff5b5b;
   }
   * { box-sizing: border-box; }
@@ -20,7 +21,7 @@
     height: 100%;
     overflow: hidden;
     font-family: 'Trebuchet MS', Arial, sans-serif;
-    background: radial-gradient(circle at 50% 0%, #7fb8ff 0%, #4f7fe0 55%, #2c4fa8 100%);
+    background: radial-gradient(circle at 50% 0%, #6a4a34 0%, #2e2013 60%, #180f09 100%);
   }
   #gameWrap {
     display: flex;
@@ -50,7 +51,7 @@
     font-size: 18px;
     font-weight: bold;
     text-shadow: 1px 1px 0 #000;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
   }
   .badge .icon { font-size: 20px; }
   .badge .value { color: var(--gold); }
@@ -58,15 +59,13 @@
   #canvasWrap {
     position: relative;
     border-radius: 12px;
-    box-shadow: 0 12px 30px rgba(0,0,0,0.4), 0 0 0 4px rgba(255,255,255,0.08);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.5), 0 0 0 4px rgba(255,214,150,0.12);
   }
   canvas {
-    background: linear-gradient(#5c94fc, #a8d8ff);
-    border: 6px solid #402a13;
+    border: 6px solid #3a2412;
     border-radius: 10px;
     display: block;
     max-width: 95vw;
-    image-rendering: pixelated;
   }
   .overlay {
     position: absolute;
@@ -74,19 +73,19 @@
     display: none;
     align-items: center;
     justify-content: center;
-    background: rgba(5, 10, 25, 0.55);
+    background: rgba(20, 12, 8, 0.55);
     border-radius: 10px;
     backdrop-filter: blur(2px);
   }
   .overlay.visible { display: flex; }
   .card {
-    background: linear-gradient(160deg, #1c2b4a, #101a30);
-    border: 3px solid rgba(255,255,255,0.15);
+    background: linear-gradient(160deg, #3a2818, #1c130b);
+    border: 3px solid rgba(255,214,150,0.2);
     border-radius: 14px;
     padding: 28px 36px;
     text-align: center;
     color: #fff;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
     animation: pop 0.25s ease-out;
     max-width: 90%;
   }
@@ -144,7 +143,7 @@
     <div id="titleOverlay" class="overlay visible">
       <div class="card">
         <h1>THE LITTLE PRINCE</h1>
-        <p>Cross the dunes, collect every star,<br>and watch out for the boa, the viper, and the baobab sprouts.</p>
+        <p>Cross the little planet's floating stones, collect every star,<br>and watch out for the boa, the viper, and the baobab sprouts.</p>
         <p>Your fox and your rose are waiting for you at the end.</p>
         <p><span class="kbd">&larr;</span><span class="kbd">&rarr;</span> or <span class="kbd">A</span><span class="kbd">D</span> to move &middot; <span class="kbd">Shift</span> to run</p>
         <p><span class="kbd">Space</span> to jump &middot; tap it again in mid-air to double jump</p>
@@ -163,8 +162,7 @@
 </div>
 
 <script>
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+/* ======================= Physics / game state (2D logic, unchanged in spirit) ======================= */
 const starCountEl = document.getElementById('starCount');
 const starTotalEl = document.getElementById('starTotal');
 const livesEl = document.getElementById('lives');
@@ -179,8 +177,6 @@ const WALK_SPEED = 4;
 const RUN_SPEED = 7.5;
 const JUMP_FORCE = -12.5;
 const DOUBLE_JUMP_FORCE = -10.5;
-
-// World is wider than the canvas; camera scrolls horizontally.
 const WORLD_WIDTH = 2400;
 const GROUND_Y = 400;
 
@@ -189,31 +185,21 @@ let jumpKeyWasDown = false;
 window.addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if (e.key === ' ') e.preventDefault();
-
   if (gameState === 'title' && e.key.toLowerCase() !== 'r') {
     gameState = 'playing';
     titleOverlay.classList.remove('visible');
-    jumpKeyWasDown = true; // don't let the key that starts the game also count as a jump
+    jumpKeyWasDown = true;
   }
   if (e.key.toLowerCase() === 'r') restart();
 });
 window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-canvas.addEventListener('click', () => {
-  if (gameState === 'title') {
-    gameState = 'playing';
-    titleOverlay.classList.remove('visible');
-  }
-});
 
-// ---- Level layout ----
-// Platforms: x, y, width, height
 const platforms = [
   { x: 0,    y: GROUND_Y, w: 500,  h: 50 },
   { x: 560,  y: GROUND_Y, w: 260,  h: 50 },
   { x: 900,  y: GROUND_Y, w: 400,  h: 50 },
   { x: 1380, y: GROUND_Y, w: 300,  h: 50 },
   { x: 1760, y: GROUND_Y, w: 640,  h: 50 },
-  // floating platforms
   { x: 250,  y: 300, w: 100, h: 20 },
   { x: 620,  y: 260, w: 100, h: 20 },
   { x: 780,  y: 320, w: 90,  h: 20 },
@@ -225,7 +211,6 @@ const platforms = [
   { x: 2100, y: 250, w: 100, h: 20 },
 ];
 
-// Gaps (pits) - defined as x ranges where there's no ground so falling = death
 const pits = [
   { x1: 500, x2: 560 },
   { x1: 820, x2: 900 },
@@ -233,7 +218,6 @@ const pits = [
   { x1: 1680, x2: 1760 },
 ];
 
-// Stars to collect
 let stars = [
   { x: 280, y: 260, taken: false },
   { x: 650, y: 220, taken: false },
@@ -248,9 +232,6 @@ let stars = [
 ];
 starTotalEl.textContent = stars.length;
 
-// Things the little prince is scared of: a slow boa (still digesting its
-// elephant), a quick desert viper, and a stationary baobab sprout that can't
-// be stomped and must be jumped clean over.
 function makeEnemies() {
   return [
     { kind: 'boa',    x: 300,  y: GROUND_Y - 20, w: 40, h: 20, minX: 260,  maxX: 460,  vx: 0.9, stompable: true,  alive: true },
@@ -261,11 +242,10 @@ function makeEnemies() {
 }
 let enemies = makeEnemies();
 
-// The fox and the rose are waiting at the far end of the dunes
 const goal = { x: 2330, y: GROUND_Y - 60, w: 60, h: 60 };
 
 let camX = 0;
-let gameState = 'title'; // title, playing, won, dead
+let gameState = 'title';
 let particles = [];
 
 function createPlayer() {
@@ -283,34 +263,31 @@ function createPlayer() {
 }
 let player = createPlayer();
 
-function resetPlayerPosition(p) {
-  p.x = 40; p.y = 300; p.vx = 0; p.vy = 0;
-}
+function resetPlayerPosition(p) { p.x = 40; p.y = 300; p.vx = 0; p.vy = 0; }
+function rectsOverlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
 
-function rectsOverlap(a, b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-}
-
-function spawnBurst(x, y, color) {
+function spawnBurst(px, py, colorHex) {
   for (let i = 0; i < 10; i++) {
     const angle = (Math.PI * 2 / 10) * i;
     particles.push({
-      x, y,
+      x: px, y: py,
       vx: Math.cos(angle) * (1.5 + Math.random() * 1.5),
       vy: Math.sin(angle) * (1.5 + Math.random() * 1.5),
-      life: 1,
-      color,
+      life: 1, colorHex,
+      mesh: makeParticleMesh(colorHex),
     });
   }
 }
 
 function updateParticles() {
   for (const p of particles) {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += 0.1;
-    p.life -= 0.03;
+    p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.life -= 0.03;
+    p.mesh.position.set(sx(p.x), sy(p.y), 0.3);
+    p.mesh.material.opacity = Math.max(p.life, 0);
+    p.mesh.scale.setScalar(Math.max(p.life, 0.05));
   }
+  const dead = particles.filter(p => p.life <= 0);
+  for (const p of dead) scene.remove(p.mesh);
   particles = particles.filter(p => p.life > 0);
 }
 
@@ -320,88 +297,55 @@ function update() {
   const running = keys['shift'];
   const maxSpeed = running ? RUN_SPEED : WALK_SPEED;
 
-  // Horizontal input
   let moving = false;
-  if (keys['arrowleft'] || keys['a']) {
-    player.vx -= running ? 1.6 : 1;
-    player.facing = -1;
-    moving = true;
-  }
-  if (keys['arrowright'] || keys['d']) {
-    player.vx += running ? 1.6 : 1;
-    player.facing = 1;
-    moving = true;
-  }
+  if (keys['arrowleft'] || keys['a']) { player.vx -= running ? 1.6 : 1; player.facing = -1; moving = true; }
+  if (keys['arrowright'] || keys['d']) { player.vx += running ? 1.6 : 1; player.facing = 1; moving = true; }
   player.vx *= FRICTION;
   if (Math.abs(player.vx) > maxSpeed) player.vx = maxSpeed * Math.sign(player.vx);
-
   if (moving && player.onGround) player.walkPhase += running ? 0.55 : 0.35;
 
-  // Jump / double jump (edge-triggered so holding the key doesn't chain-jump)
   const jumpPressed = keys['arrowup'] || keys['w'] || keys[' '];
   if (jumpPressed && !jumpKeyWasDown) {
     if (player.onGround) {
-      player.vy = JUMP_FORCE;
-      player.onGround = false;
-      player.jumpsUsed = 1;
+      player.vy = JUMP_FORCE; player.onGround = false; player.jumpsUsed = 1;
     } else if (player.jumpsUsed < 2) {
-      player.vy = DOUBLE_JUMP_FORCE;
-      player.jumpsUsed = 2;
-      spawnBurst(player.x - camX + player.w / 2, player.y + player.h / 2, '255, 255, 255');
+      player.vy = DOUBLE_JUMP_FORCE; player.jumpsUsed = 2;
+      spawnBurst(player.x + player.w / 2, player.y + player.h / 2, 0xffffff);
     }
   }
   jumpKeyWasDown = jumpPressed;
 
-  // Gravity
   player.vy += GRAVITY;
   if (player.vy > 15) player.vy = 15;
 
-  // Move horizontally then resolve collisions
   player.x += player.vx;
   player.onGround = false;
-
   for (const p of platforms) {
     if (rectsOverlap(player, p)) {
-      // Resolve based on overlap direction (simple approach)
       const overlapLeft = (player.x + player.w) - p.x;
       const overlapRight = (p.x + p.w) - player.x;
-      if (player.vx > 0 && overlapLeft < 20) {
-        player.x = p.x - player.w;
-      } else if (player.vx < 0 && overlapRight < 20) {
-        player.x = p.x + p.w;
-      }
+      if (player.vx > 0 && overlapLeft < 20) player.x = p.x - player.w;
+      else if (player.vx < 0 && overlapRight < 20) player.x = p.x + p.w;
     }
   }
 
-  // Move vertically then resolve collisions
   player.y += player.vy;
   for (const p of platforms) {
     if (rectsOverlap(player, p)) {
       if (player.vy > 0) {
-        // landing on top
-        player.y = p.y - player.h;
-        player.vy = 0;
-        player.onGround = true;
-        player.jumpsUsed = 0;
+        player.y = p.y - player.h; player.vy = 0; player.onGround = true; player.jumpsUsed = 0;
       } else if (player.vy < 0) {
-        // hit head
-        player.y = p.y + p.h;
-        player.vy = 0;
+        player.y = p.y + p.h; player.vy = 0;
       }
     }
   }
 
-  // Fell into a pit or off the world -> lose a life
   const inPit = pits.some(pit => player.x + player.w/2 > pit.x1 && player.x + player.w/2 < pit.x2);
-  if (player.y > 500 || (inPit && player.y > GROUND_Y)) {
-    loseLife();
-  }
+  if (player.y > 500 || (inPit && player.y > GROUND_Y)) loseLife();
 
-  // World bounds
   if (player.x < 0) player.x = 0;
   if (player.x + player.w > WORLD_WIDTH) player.x = WORLD_WIDTH - player.w;
 
-  // Star collection
   for (const s of stars) {
     if (!s.taken) {
       const starBox = { x: s.x - 12, y: s.y - 12, w: 24, h: 24 };
@@ -409,15 +353,13 @@ function update() {
         s.taken = true;
         player.starsCollected++;
         starCountEl.textContent = player.starsCollected;
-        spawnBurst(s.x - camX, s.y, '255, 215, 0');
+        spawnBurst(s.x, s.y, 0xffd700);
       }
     }
   }
 
   if (player.invuln > 0) player.invuln--;
 
-  // Enemies: patrol (or sit still), get stomped from above if stompable, or
-  // hurt the player on contact otherwise.
   for (const en of enemies) {
     if (!en.alive) continue;
     en.x += en.vx;
@@ -429,7 +371,7 @@ function update() {
       if (stomping) {
         en.alive = false;
         player.vy = JUMP_FORCE * 0.55;
-        spawnBurst(en.x - camX + en.w / 2, en.y, '120, 150, 70');
+        spawnBurst(en.x + en.w / 2, en.y, 0x789646);
       } else if (player.invuln <= 0) {
         const knockDir = (player.x + player.w / 2 < en.x + en.w / 2) ? -1 : 1;
         loseLife();
@@ -440,15 +382,11 @@ function update() {
     }
   }
 
-  // Goal check - reunited with the fox and the rose
-  if (rectsOverlap(player, goal)) {
-    winGame();
-  }
+  if (rectsOverlap(player, goal)) winGame();
 
-  // Camera follows player, clamped to world
   camX = player.x - 300;
   if (camX < 0) camX = 0;
-  if (camX > WORLD_WIDTH - canvas.width) camX = WORLD_WIDTH - canvas.width;
+  if (camX > WORLD_WIDTH - 800) camX = WORLD_WIDTH - 800;
 
   updateParticles();
 }
@@ -470,14 +408,8 @@ function winGame() {
   showMessage('HOME AT LAST', 'Your fox and your rose were waiting. You brought back ' + player.starsCollected + '/' + stars.length + ' stars.');
 }
 
-function showMessage(title, body) {
-  msgTitle.textContent = title;
-  msgBody.textContent = body;
-  msgOverlay.classList.add('visible');
-}
-function hideMessage() {
-  msgOverlay.classList.remove('visible');
-}
+function showMessage(title, body) { msgTitle.textContent = title; msgBody.textContent = body; msgOverlay.classList.add('visible'); }
+function hideMessage() { msgOverlay.classList.remove('visible'); }
 
 function restart() {
   player = createPlayer();
@@ -485,6 +417,7 @@ function restart() {
   enemies = makeEnemies();
   starCountEl.textContent = 0;
   livesEl.textContent = player.lives;
+  for (const p of particles) scene.remove(p.mesh);
   particles = [];
   jumpKeyWasDown = false;
   gameState = 'playing';
@@ -492,549 +425,344 @@ function restart() {
   hideMessage();
 }
 
-function drawSky() {
-  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  grad.addColorStop(0, '#6fb2ff');
-  grad.addColorStop(1, '#bfe4ff');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+/* ======================= 3D rendering (Three.js) ======================= */
+const SCALE = 0.045;
+function sx(px) { return px * SCALE; }
+function sy(centerPx) { return (GROUND_Y - centerPx) * SCALE; }
+
+const canvas = document.getElementById('game');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(800, 450, false);
+
+const scene = new THREE.Scene();
+const BG_COLOR = 0x2b1f16;
+scene.background = new THREE.Color(BG_COLOR);
+scene.fog = new THREE.Fog(BG_COLOR, 14, 42);
+
+const camera = new THREE.PerspectiveCamera(45, 800 / 450, 0.1, 100);
+const CAMERA_HEIGHT = 3.1, CAMERA_DIST = 10, LOOK_HEIGHT = 1.35;
+camera.position.set(0, CAMERA_HEIGHT, CAMERA_DIST);
+
+const ambient = new THREE.HemisphereLight(0xffdca0, 0x2a1c12, 0.75);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xffd9a0, 1.1);
+sun.position.set(-6, 10, 6);
+scene.add(sun);
+const rim = new THREE.DirectionalLight(0xaebfff, 0.25);
+rim.position.set(6, 4, -6);
+scene.add(rim);
+
+/* ---- Camera-attached backdrop: bokeh, starfield, distant little planets ---- */
+function makeBokehTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.4, 'rgba(255,220,150,0.6)');
+  grad.addColorStop(1, 'rgba(255,220,150,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
 }
-
-function drawSun() {
-  ctx.save();
-  ctx.translate(90, 80);
-  ctx.fillStyle = 'rgba(255, 244, 200, 0.9)';
-  ctx.shadowColor = 'rgba(255, 230, 150, 0.9)';
-  ctx.shadowBlur = 25;
-  ctx.beginPath();
-  ctx.arc(0, 0, 30, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = 'rgba(255, 244, 200, 0.6)';
-  ctx.lineWidth = 3;
-  for (let i = 0; i < 8; i++) {
-    const a = (Math.PI * 2 / 8) * i;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(a) * 38, Math.sin(a) * 38);
-    ctx.lineTo(Math.cos(a) * 48, Math.sin(a) * 48);
-    ctx.stroke();
-  }
-  ctx.restore();
+const bokehTex = makeBokehTexture();
+const backdrop = new THREE.Group();
+camera.add(backdrop);
+for (let i = 0; i < 34; i++) {
+  const size = 0.4 + Math.random() * 1.6;
+  const mat = new THREE.SpriteMaterial({ map: bokehTex, color: [0xf4c869, 0xe8a23c, 0xfff3d6][i % 3], transparent: true, opacity: 0.25 + Math.random() * 0.35, depthWrite: false });
+  const spr = new THREE.Sprite(mat);
+  spr.position.set((Math.random() - 0.5) * 30, (Math.random() - 0.2) * 16, -15 - Math.random() * 20);
+  spr.scale.setScalar(size);
+  backdrop.add(spr);
 }
-
-function drawPlanets() {
-  const spots = [
-    { x: 620, y: 110, r: 10, color: '#e08fae' },
-    { x: 1550, y: 90,  r: 7,  color: '#8fc7e0' },
-    { x: 2050, y: 130, r: 12, color: '#c9a2e0' },
-  ];
-  for (const s of spots) {
-    const drawX = (s.x - camX * 0.2) % (WORLD_WIDTH + 400);
-    ctx.fillStyle = s.color;
-    ctx.beginPath();
-    ctx.arc(drawX, s.y, s.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(drawX, s.y, s.r * 1.8, s.r * 0.6, -0.4, 0, Math.PI * 2);
-    ctx.stroke();
-  }
+const starGeo = new THREE.BufferGeometry();
+const starCount = 90;
+const starPos = new Float32Array(starCount * 3);
+for (let i = 0; i < starCount; i++) {
+  starPos[i*3] = (Math.random() - 0.5) * 40;
+  starPos[i*3+1] = Math.random() * 18;
+  starPos[i*3+2] = -20 - Math.random() * 20;
 }
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+const starField = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xfff3d6, size: 0.12, transparent: true, opacity: 0.85 }));
+backdrop.add(starField);
+[[-8, 2, -18, 0.9, 0xe08fae], [10, 5, -22, 0.6, 0x8fc7e0], [3, -3, -16, 0.5, 0xc9a2e0]].forEach(([x,y,z,r,color]) => {
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 16), new THREE.MeshStandardMaterial({ color, roughness: 0.6, emissive: color, emissiveIntensity: 0.15 }));
+  planet.position.set(x, y, z);
+  backdrop.add(planet);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.4, r * 1.8, 24), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, side: THREE.DoubleSide }));
+  ring.rotation.x = Math.PI / 2.4;
+  planet.add(ring);
+});
 
-function drawBirds(t) {
-  ctx.strokeStyle = 'rgba(60, 70, 90, 0.5)';
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 4; i++) {
-    const bx = (i * 300 - camX * 0.6 + t / 40) % (WORLD_WIDTH + 300) - 50;
-    const by = 100 + (i % 2) * 40 + Math.sin(t / 400 + i) * 6;
-    ctx.beginPath();
-    ctx.moveTo(bx - 8, by);
-    ctx.quadraticCurveTo(bx - 4, by - 6, bx, by);
-    ctx.quadraticCurveTo(bx + 4, by - 6, bx + 8, by);
-    ctx.stroke();
-  }
+/* ---- World: little-planet rock chunks for platforms ---- */
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x5b6b8c, roughness: 0.95, flatShading: true });
+function addRockChunk(cxPx, cyPx, wPx, hPx) {
+  const geo = new THREE.IcosahedronGeometry(1, 1);
+  const mesh = new THREE.Mesh(geo, rockMat);
+  mesh.position.set(sx(cxPx), sy(cyPx), 0);
+  mesh.scale.set(Math.max(wPx * SCALE / 2, 0.4), Math.max(hPx * SCALE / 2, 0.3), 1.1);
+  mesh.rotation.set(Math.random() * 0.3, Math.random() * Math.PI, Math.random() * 0.2);
+  scene.add(mesh);
 }
-
-function drawMountains() {
-  ctx.fillStyle = 'rgba(90, 110, 160, 0.45)';
-  for (let i = 0; i < 5; i++) {
-    const mx = (i * 420 - camX * 0.15) % (WORLD_WIDTH + 420) - 100;
-    ctx.beginPath();
-    ctx.moveTo(mx, GROUND_Y + 10);
-    ctx.lineTo(mx + 110, GROUND_Y - 130);
-    ctx.lineTo(mx + 220, GROUND_Y + 10);
-    ctx.closePath();
-    ctx.fill();
-  }
-}
-
-function drawRocks() {
-  const rockXs = [420, 1150, 1980];
-  for (const rx of rockXs) {
-    const drawX = rx - camX * 0.55;
-    if (drawX < -80 || drawX > canvas.width + 80) continue;
-    ctx.fillStyle = '#a08a72';
-    ctx.beginPath();
-    ctx.moveTo(drawX - 30, GROUND_Y + 10);
-    ctx.lineTo(drawX - 18, GROUND_Y - 38);
-    ctx.lineTo(drawX + 4, GROUND_Y - 50);
-    ctx.lineTo(drawX + 22, GROUND_Y - 20);
-    ctx.lineTo(drawX + 32, GROUND_Y + 10);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.beginPath();
-    ctx.moveTo(drawX - 4, GROUND_Y - 48);
-    ctx.lineTo(drawX + 10, GROUND_Y - 30);
-    ctx.lineTo(drawX - 2, GROUND_Y - 20);
-    ctx.closePath();
-    ctx.fill();
-  }
-}
-
-function drawBackgroundHills() {
-  ctx.fillStyle = '#4fa84a';
-  for (let i = 0; i < 6; i++) {
-    const hx = (i * 500 - camX * 0.3) % (WORLD_WIDTH + 500);
-    ctx.beginPath();
-    ctx.arc(hx, GROUND_Y + 40, 80, Math.PI, 0);
-    ctx.fill();
-  }
-  ctx.fillStyle = '#3d8f3a';
-  for (let i = 0; i < 6; i++) {
-    const hx = (i * 500 - camX * 0.3) % (WORLD_WIDTH + 500) + 60;
-    ctx.beginPath();
-    ctx.arc(hx, GROUND_Y + 55, 55, Math.PI, 0);
-    ctx.fill();
-  }
-  // clouds
-  ctx.fillStyle = '#ffffff';
-  for (let i = 0; i < 8; i++) {
-    const cx = (i * 350 - camX * 0.5) % (WORLD_WIDTH + 350);
-    const cy = 60 + (i % 3) * 30;
-    drawCloud(cx, cy);
-  }
-}
-
-function drawCloud(x, y) {
-  ctx.beginPath();
-  ctx.arc(x, y, 18, 0, Math.PI * 2);
-  ctx.arc(x + 20, y - 8, 20, 0, Math.PI * 2);
-  ctx.arc(x + 42, y, 18, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawBush(drawX, y) {
-  ctx.fillStyle = '#3d8f3a';
-  ctx.beginPath();
-  ctx.arc(drawX, y, 10, Math.PI, 0);
-  ctx.arc(drawX + 12, y - 4, 13, Math.PI, 0);
-  ctx.arc(drawX + 26, y, 10, Math.PI, 0);
-  ctx.fill();
-}
-
-function drawPlatforms() {
-  for (const p of platforms) {
-    const drawX = p.x - camX;
-    if (drawX + p.w < 0 || drawX > canvas.width) continue;
-    const isGround = p.y === GROUND_Y;
-
-    if (isGround) {
-      // dirt block style with brick seams
-      ctx.fillStyle = '#8b5a2b';
-      ctx.fillRect(drawX, p.y, p.w, p.h);
-      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-      ctx.lineWidth = 1;
-      for (let bx = 0; bx < p.w; bx += 24) {
-        ctx.beginPath();
-        ctx.moveTo(drawX + bx, p.y + 10);
-        ctx.lineTo(drawX + bx, p.y + p.h);
-        ctx.stroke();
-      }
-      ctx.fillStyle = '#5aa64c';
-      ctx.fillRect(drawX, p.y, p.w, 10);
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.fillRect(drawX, p.y, p.w, 3);
-
-      // grass tufts + occasional flowers along the top edge
-      for (let gx = 6; gx < p.w - 6; gx += 18) {
-        const wx = p.x + gx;
-        ctx.fillStyle = '#3d8f3a';
-        ctx.beginPath();
-        ctx.moveTo(drawX + gx - 3, p.y);
-        ctx.lineTo(drawX + gx, p.y - 6);
-        ctx.lineTo(drawX + gx + 3, p.y);
-        ctx.fill();
-        if (Math.floor(wx / 18) % 5 === 0) {
-          ctx.fillStyle = '#fff';
-          ctx.beginPath();
-          ctx.arc(drawX + gx, p.y - 9, 3, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#ffd700';
-          ctx.beginPath();
-          ctx.arc(drawX + gx, p.y - 9, 1.4, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-      // foreground bushes every so often
-      if (p.w > 90) drawBush(drawX + p.w / 2 - 13, p.y);
-    } else {
-      // floating wooden plank platform
-      ctx.fillStyle = '#a9773c';
-      ctx.fillRect(drawX, p.y, p.w, p.h);
-      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-      ctx.lineWidth = 1;
-      for (let gy = 4; gy < p.h; gy += 6) {
-        ctx.beginPath();
-        ctx.moveTo(drawX + 3, p.y + gy);
-        ctx.lineTo(drawX + p.w - 3, p.y + gy);
-        ctx.stroke();
-      }
-      ctx.fillStyle = 'rgba(255,255,255,0.2)';
-      ctx.fillRect(drawX, p.y, p.w, 3);
-      // metal end brackets
-      ctx.fillStyle = '#5b5b5b';
-      ctx.fillRect(drawX + 2, p.y, 6, p.h);
-      ctx.fillRect(drawX + p.w - 8, p.y, 6, p.h);
-      ctx.fillStyle = '#8c8c8c';
-      ctx.beginPath();
-      ctx.arc(drawX + 5, p.y + p.h / 2, 2, 0, Math.PI * 2);
-      ctx.arc(drawX + p.w - 5, p.y + p.h / 2, 2, 0, Math.PI * 2);
-      ctx.fill();
+for (const p of platforms) {
+  const isGround = p.y === GROUND_Y;
+  if (isGround) {
+    const chunkSize = 95;
+    for (let cx = p.x; cx < p.x + p.w; cx += chunkSize) {
+      const thisW = Math.min(chunkSize, p.x + p.w - cx);
+      addRockChunk(cx + thisW / 2, p.y + p.h / 2, thisW * 1.15, p.h);
     }
+  } else {
+    addRockChunk(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h * 1.6);
   }
 }
 
-function drawStar(x, y, taken, t) {
-  if (taken) return;
-  const drawX = x - camX;
-  if (drawX < -30 || drawX > canvas.width + 30) return;
-  const bob = Math.sin(t / 300 + x) * 4;
-  const scale = 1 + Math.sin(t / 200 + x) * 0.12;
-  ctx.save();
-  ctx.translate(drawX, y + bob);
-  ctx.scale(scale, scale);
-  ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
-  ctx.shadowBlur = 12;
-  ctx.fillStyle = '#ffd700';
-  ctx.strokeStyle = '#c98e00';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
+/* ---- Stars ---- */
+function makeStarMesh() {
+  const shape = new THREE.Shape();
+  const spikes = 5, outerR = 0.28, innerR = 0.12;
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const a = (Math.PI / spikes) * i - Math.PI / 2;
+    const px = Math.cos(a) * r, py = Math.sin(a) * r;
+    if (i === 0) shape.moveTo(px, py); else shape.lineTo(px, py);
+  }
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: false });
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffbf00, emissiveIntensity: 0.6, roughness: 0.4 });
+  return new THREE.Mesh(geo, mat);
+}
+const starMeshes = stars.map(s => {
+  const m = makeStarMesh();
+  m.position.set(sx(s.x), sy(s.y), 0);
+  scene.add(m);
+  return m;
+});
+
+/* ---- Enemies ---- */
+function makeBoaMesh() {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0x6f9950, roughness: 0.85, flatShading: true });
+  const sizes = [0.22, 0.34, 0.5, 0.34, 0.22];
+  sizes.forEach((r, i) => {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 10), mat);
+    s.position.set((i - 2) * 0.32, r * 0.4, 0);
+    g.add(s);
+  });
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.3, 8), mat);
+  head.rotation.z = -Math.PI / 2;
+  head.position.set(0.75, 0.16, 0);
+  g.add(head);
+  return g;
+}
+function makeViperMesh() {
+  const g = new THREE.Group();
+  const colors = [0xe0b93a, 0x2a2a2a];
   for (let i = 0; i < 5; i++) {
-    const angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
-    const outerX = Math.cos(angle) * 12;
-    const outerY = Math.sin(angle) * 12;
-    const innerAngle = angle + Math.PI / 5;
-    const innerX = Math.cos(innerAngle) * 5;
-    const innerY = Math.sin(innerAngle) * 5;
-    if (i === 0) ctx.moveTo(outerX, outerY);
-    else ctx.lineTo(outerX, outerY);
-    ctx.lineTo(innerX, innerY);
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.24, 8), new THREE.MeshStandardMaterial({ color: colors[i % 2], roughness: 0.7 }));
+    seg.rotation.z = Math.PI / 2;
+    seg.position.set((i - 2) * 0.22, 0.12 + Math.sin(i) * 0.05, 0);
+    g.add(seg);
   }
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.26, 8), new THREE.MeshStandardMaterial({ color: 0xe0b93a }));
+  head.rotation.z = -Math.PI / 2;
+  head.position.set(0.62, 0.14, 0);
+  g.add(head);
+  return g;
 }
-
-function drawParticles() {
-  for (const p of particles) {
-    ctx.fillStyle = `rgba(${p.color}, ${Math.max(p.life, 0)})`;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-    ctx.fill();
+function makeBaobabMesh() {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.9 }));
+  trunk.position.y = 0.25;
+  g.add(trunk);
+  const spikeMat = new THREE.MeshStandardMaterial({ color: 0x2f5c2a, roughness: 0.8, flatShading: true });
+  const spikes = [[0, 0.7, 0, 0.35], [-0.2, 0.55, 0.1, 0.25], [0.22, 0.6, -0.08, 0.28], [-0.15, 0.45, -0.15, 0.2], [0.18, 0.42, 0.15, 0.2]];
+  for (const [x, y, z, h] of spikes) {
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.09, h, 6), spikeMat);
+    spike.position.set(x, y, z);
+    g.add(spike);
   }
+  return g;
 }
+const enemyMeshes = enemies.map(en => {
+  const m = en.kind === 'boa' ? makeBoaMesh() : en.kind === 'viper' ? makeViperMesh() : makeBaobabMesh();
+  scene.add(m);
+  return m;
+});
 
-function drawBoa(en, drawX, t) {
-  const wiggle = Math.sin(t / 200 + drawX / 30) * 3;
-  ctx.save();
-  ctx.translate(drawX, en.y + en.h / 2);
-  ctx.fillStyle = '#6f9950';
-  ctx.beginPath();
-  ctx.moveTo(-en.w / 2, 6);
-  ctx.quadraticCurveTo(-en.w / 4, -10 + wiggle, 0, -4);
-  ctx.quadraticCurveTo(en.w / 4, 2, en.w / 2 - 6, -8);
-  ctx.quadraticCurveTo(en.w / 2 + 6, -2, en.w / 2, 8);
-  ctx.quadraticCurveTo(0, 14, -en.w / 2, 6);
-  ctx.closePath();
-  ctx.fill();
-  // digested-elephant bulge
-  ctx.fillStyle = '#547a3c';
-  ctx.beginPath();
-  ctx.ellipse(-2, -2, 11, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // head + eye
-  ctx.fillStyle = '#6f9950';
-  ctx.beginPath();
-  ctx.arc(en.w / 2 - 2, -8, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#1a1a1a';
-  ctx.beginPath();
-  ctx.arc(en.w / 2, -10, 1.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
+/* ---- Goal scene: the rose under glass, and the fox waiting ---- */
+const goalGroup = new THREE.Group();
+{
+  const mound = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3, 1), new THREE.MeshStandardMaterial({ color: 0xd8c48a, roughness: 0.9, flatShading: true }));
+  mound.scale.set(1.2, 0.5, 1);
+  mound.position.set(0, -0.35, 0);
+  goalGroup.add(mound);
 
-function drawViper(en, drawX, t) {
-  const wiggle = Math.sin(t / 90 + drawX / 20) * 4;
-  ctx.save();
-  ctx.translate(drawX, en.y + en.h / 2);
-  ctx.strokeStyle = '#e0b93a';
-  ctx.lineWidth = 8;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(-en.w / 2, 4);
-  ctx.quadraticCurveTo(0, 4 + wiggle, en.w / 2 - 4, -4);
-  ctx.stroke();
-  ctx.strokeStyle = '#2a2a2a';
-  ctx.lineWidth = 3;
-  for (let i = -1; i <= 1; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * 8 - 2, 2 + Math.sin(i) * wiggle * 0.3);
-    ctx.lineTo(i * 8 + 2, 6 + Math.sin(i) * wiggle * 0.3);
-    ctx.stroke();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.4, 6), new THREE.MeshStandardMaterial({ color: 0x3d8f3a }));
+  stem.position.set(-0.4, 0.2, 0);
+  goalGroup.add(stem);
+  const rose = new THREE.Group();
+  for (let i = 0; i < 5; i++) {
+    const petal = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0xe0334f, roughness: 0.5 }));
+    petal.rotation.z = (i / 5) * Math.PI * 2;
+    petal.position.set(Math.cos((i/5)*Math.PI*2) * 0.03, Math.sin((i/5)*Math.PI*2) * 0.03, 0);
+    rose.add(petal);
   }
-  // triangular head
-  ctx.fillStyle = '#e0b93a';
-  ctx.beginPath();
-  ctx.moveTo(en.w / 2 - 4, -4);
-  ctx.lineTo(en.w / 2 + 6, -6);
-  ctx.lineTo(en.w / 2 - 2, 2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#1a1a1a';
-  ctx.beginPath();
-  ctx.arc(en.w / 2, -4, 1.3, 0, Math.PI * 2);
-  ctx.fill();
-  // forked tongue
-  ctx.strokeStyle = '#c0304a';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(en.w / 2 + 6, -6);
-  ctx.lineTo(en.w / 2 + 11, -8);
-  ctx.moveTo(en.w / 2 + 8, -7);
-  ctx.lineTo(en.w / 2 + 11, -5);
-  ctx.stroke();
-  ctx.restore();
+  rose.position.set(-0.4, 0.46, 0);
+  goalGroup.add(rose);
+  goalGroup.userData.rose = rose;
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 16, 0, Math.PI * 2, 0, Math.PI / 1.7), new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.2, roughness: 0.05, metalness: 0, side: THREE.DoubleSide }));
+  dome.position.set(-0.4, 0.32, 0);
+  goalGroup.add(dome);
+
+  const fox = new THREE.Group();
+  const foxMat = new THREE.MeshStandardMaterial({ color: 0xe07a2e, roughness: 0.7 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 12), foxMat);
+  body.scale.set(1.3, 1, 1);
+  body.position.set(0.5, 0.05, 0);
+  fox.add(body);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.45, 8), foxMat);
+  tail.rotation.z = Math.PI / 2.6;
+  tail.position.set(0.95, 0.15, 0);
+  fox.add(tail);
+  const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  tailTip.position.set(1.2, 0.32, 0);
+  fox.add(tailTip);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), foxMat);
+  head.position.set(0.15, 0.18, 0);
+  fox.add(head);
+  const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  muzzle.position.set(0.02, 0.13, 0);
+  fox.add(muzzle);
+  [[-1, 1], [1, 1]].forEach(([dir]) => {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.16, 6), foxMat);
+    ear.position.set(0.1 + dir * 0.08, 0.34, 0);
+    fox.add(ear);
+  });
+  goalGroup.userData.fox = fox;
+  goalGroup.add(fox);
+}
+goalGroup.position.set(sx(goal.x + goal.w / 2), sy(GROUND_Y), 0);
+scene.add(goalGroup);
+
+/* ---- The Little Prince (player) ---- */
+function makeLimb(radius, length, color) {
+  const g = new THREE.Group();
+  const geo = new THREE.CylinderGeometry(radius, radius * 0.85, length, 8);
+  geo.translate(0, -length / 2, 0);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.8 }));
+  g.add(mesh);
+  return g;
+}
+const playerGroup = new THREE.Group();
+const MINT = 0xbfe6c8, CREAM = 0xffe3c4, GOLD = 0xe8b23c, DARK = 0x2e3b2a, HAIR = 0xf0c454;
+
+const legL = makeLimb(0.11, 0.62, DARK); legL.position.set(-0.14, 0.62, 0); playerGroup.add(legL);
+const legR = makeLimb(0.11, 0.62, DARK); legR.position.set(0.14, 0.62, 0); playerGroup.add(legR);
+[legL, legR].forEach(l => { const boot = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), new THREE.MeshStandardMaterial({ color: 0x4a3320 })); boot.position.y = -0.6; boot.scale.set(1, 0.7, 1.3); l.add(boot); });
+
+const armL = makeLimb(0.08, 0.5, MINT); armL.position.set(-0.28, 1.25, 0); playerGroup.add(armL);
+const armR = makeLimb(0.08, 0.5, MINT); armR.position.set(0.28, 1.25, 0); playerGroup.add(armR);
+[armL, armR].forEach(a => { const hand = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), new THREE.MeshStandardMaterial({ color: CREAM })); hand.position.y = -0.5; a.add(hand); });
+
+const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.7, 10), new THREE.MeshStandardMaterial({ color: MINT, roughness: 0.85 }));
+torso.position.set(0, 1.0, 0);
+playerGroup.add(torso);
+const belt = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.05, 8, 16), new THREE.MeshStandardMaterial({ color: GOLD, roughness: 0.4, metalness: 0.3 }));
+belt.rotation.x = Math.PI / 2;
+belt.position.set(0, 0.8, 0);
+playerGroup.add(belt);
+
+const scarfGroup = new THREE.Group();
+scarfGroup.position.set(0, 1.35, -0.15);
+playerGroup.add(scarfGroup);
+const scarfSegs = [];
+for (let i = 0; i < 4; i++) {
+  const seg = new THREE.Mesh(new THREE.PlaneGeometry(0.28 - i * 0.03, 0.22), new THREE.MeshStandardMaterial({ color: GOLD, roughness: 0.6, side: THREE.DoubleSide }));
+  seg.position.set(0, -i * 0.2, -i * 0.05);
+  scarfGroup.add(seg);
+  scarfSegs.push(seg);
 }
 
-function drawBaobab(en, drawX) {
-  ctx.save();
-  ctx.translate(drawX + en.w / 2, en.y + en.h);
-  ctx.fillStyle = '#4a3520';
-  ctx.fillRect(-4, -en.h + 6, 8, en.h - 6);
-  ctx.fillStyle = '#2f5c2a';
-  const spikes = [[-10, -en.h], [-2, -en.h - 6], [8, -en.h + 2], [-14, -en.h + 12], [12, -en.h + 12]];
-  for (const [sx, sy] of spikes) {
-    ctx.beginPath();
-    ctx.moveTo(0, -en.h + 8);
-    ctx.lineTo(sx, sy);
-    ctx.lineTo(sx > 0 ? sx - 8 : sx + 8, sy + 6);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
+const headGroup = new THREE.Group();
+headGroup.position.set(0, 1.55, 0);
+playerGroup.add(headGroup);
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 14), new THREE.MeshStandardMaterial({ color: CREAM, roughness: 0.7 }));
+headGroup.add(head);
+const hairMat = new THREE.MeshStandardMaterial({ color: HAIR, roughness: 0.75 });
+const hairTufts = [[0, 0.24, 0.02, 0.14], [-0.14, 0.2, 0.05, 0.12], [0.14, 0.2, 0.05, 0.12], [-0.08, 0.26, -0.1, 0.11], [0.08, 0.26, -0.1, 0.11], [0, 0.3, -0.05, 0.1]];
+for (const [x, y, z, s] of hairTufts) {
+  const tuft = new THREE.Mesh(new THREE.ConeGeometry(s, s * 2, 8), hairMat);
+  tuft.position.set(x, y, z);
+  tuft.rotation.z = (Math.random() - 0.5) * 0.6;
+  headGroup.add(tuft);
+}
+const eyeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 6), eyeMat); eyeL.position.set(-0.09, 0.02, 0.23); headGroup.add(eyeL);
+const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 6), eyeMat); eyeR.position.set(0.09, 0.02, 0.23); headGroup.add(eyeR);
+
+scene.add(playerGroup);
+
+function makeParticleMesh(colorHex) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 1 }));
+  scene.add(m);
+  return m;
 }
 
-function drawEnemies(t) {
-  for (const en of enemies) {
-    if (!en.alive) continue;
-    const drawX = en.x - camX;
-    if (drawX + en.w < 0 || drawX > canvas.width) continue;
-    if (en.kind === 'boa') drawBoa(en, drawX, t);
-    else if (en.kind === 'viper') drawViper(en, drawX, t);
-    else drawBaobab(en, drawX);
-  }
-}
+/* ---- Per-frame sync of physics state -> 3D scene ---- */
+function syncScene(t) {
+  const cxPx = player.x + player.w / 2;
+  const cyPx = player.y + player.h;
+  playerGroup.position.set(sx(cxPx), sy(cyPx), 0);
+  playerGroup.scale.x = player.facing;
+  const squash = Math.max(-0.2, Math.min(0.2, player.vy / 30));
+  playerGroup.scale.y = 1 + squash * 0.3;
 
-function drawGoalScene(t) {
-  const drawX = goal.x - camX;
-  if (drawX < -120 || drawX > canvas.width + 120) return;
-  const baseY = GROUND_Y;
+  const legSwing = player.onGround ? Math.sin(player.walkPhase) * 0.5 : 0.15;
+  legL.rotation.x = legSwing;
+  legR.rotation.x = -legSwing;
+  armL.rotation.x = -legSwing * 0.7;
+  armR.rotation.x = legSwing * 0.7;
+  scarfSegs.forEach((seg, i) => {
+    seg.rotation.x = Math.sin(t / 250 + i * 0.6) * 0.3 - 0.2 - Math.abs(player.vx) * 0.03;
+    seg.rotation.y = Math.sin(t / 300 + i) * 0.15;
+  });
+  playerGroup.visible = player.invuln <= 0 || Math.floor(t / 80) % 2 === 0;
 
-  // little sand mound
-  ctx.fillStyle = '#d8c48a';
-  ctx.beginPath();
-  ctx.arc(drawX + 30, baseY, 34, Math.PI, 0);
-  ctx.fill();
+  stars.forEach((s, i) => {
+    const m = starMeshes[i];
+    m.visible = !s.taken;
+    if (!s.taken) {
+      const bob = Math.sin(t / 300 + s.x) * 0.15;
+      m.position.set(sx(s.x), sy(s.y) + bob, 0);
+      m.rotation.y += 0.03;
+      const sc = 1 + Math.sin(t / 200 + s.x) * 0.12;
+      m.scale.setScalar(sc);
+    }
+  });
 
-  // the rose, under its glass dome
-  const roseX = drawX + 8, roseY = baseY - 26;
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(roseX, roseY + 4, 16, Math.PI, 0);
-  ctx.stroke();
-  ctx.fillStyle = '#3d8f3a';
-  ctx.fillRect(roseX - 1, roseY + 4, 2, 10);
-  const sway = Math.sin(t / 300) * 3;
-  ctx.fillStyle = '#e0334f';
-  ctx.beginPath();
-  ctx.arc(roseX + sway, roseY - 2, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#c0203c';
-  ctx.beginPath();
-  ctx.arc(roseX + sway, roseY - 2, 3, 0, Math.PI * 2);
-  ctx.fill();
+  enemies.forEach((en, i) => {
+    const m = enemyMeshes[i];
+    m.visible = en.alive;
+    if (en.alive) {
+      m.position.set(sx(en.x), sy(en.y + en.h), 0);
+      m.scale.x = en.vx < 0 ? -1 : 1;
+    }
+  });
 
-  // the fox, sitting and waiting
-  const foxX = drawX + 46, foxY = baseY - 14;
-  ctx.fillStyle = '#e07a2e';
-  ctx.beginPath();
-  ctx.ellipse(foxX, foxY, 14, 11, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // tail curled around
-  ctx.beginPath();
-  ctx.ellipse(foxX + 14, foxY + 4, 9, 5, 0.6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(foxX + 20, foxY + 6, 3, 0, Math.PI * 2);
-  ctx.fill();
-  // head
-  ctx.fillStyle = '#e07a2e';
-  ctx.beginPath();
-  ctx.arc(foxX - 10, foxY - 8, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(foxX - 11, foxY - 5, 3.5, 0, Math.PI * 2);
-  ctx.fill();
-  // ears
-  ctx.fillStyle = '#e07a2e';
-  ctx.beginPath();
-  ctx.moveTo(foxX - 15, foxY - 12);
-  ctx.lineTo(foxX - 17, foxY - 20);
-  ctx.lineTo(foxX - 11, foxY - 14);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(foxX - 6, foxY - 13);
-  ctx.lineTo(foxX - 3, foxY - 21);
-  ctx.lineTo(foxX - 1, foxY - 13);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#1a1a1a';
-  ctx.beginPath();
-  ctx.arc(foxX - 13, foxY - 9, 1.3, 0, Math.PI * 2);
-  ctx.arc(foxX - 6, foxY - 9, 1.3, 0, Math.PI * 2);
-  ctx.arc(foxX - 9, foxY - 5, 1, 0, Math.PI * 2);
-  ctx.fill();
-}
+  if (goalGroup.userData.rose) goalGroup.userData.rose.rotation.z = Math.sin(t / 300) * 0.15;
+  if (goalGroup.userData.fox) goalGroup.userData.fox.position.y = Math.sin(t / 500) * 0.02;
 
-function drawPlayer() {
-  const drawX = player.x - camX;
-  const drawY = player.y;
-  const squash = Math.max(-0.25, Math.min(0.25, player.vy / 30));
-  ctx.save();
-  ctx.translate(drawX + player.w / 2, drawY + player.h / 2);
-  ctx.scale(player.facing * (1 - squash * 0.3), 1 + squash * 0.3);
-
-  const legSwing = player.onGround ? Math.sin(player.walkPhase) * 6 : 0;
-  const w = player.w, h = player.h;
-  const scarfWave = Math.sin(Date.now() / 150) * 5 + player.vx * 1.5;
-
-  // trailing scarf, behind the body
-  ctx.fillStyle = '#e0a940';
-  ctx.beginPath();
-  ctx.moveTo(-w/2 + 2, -h/2 + 10);
-  ctx.quadraticCurveTo(-w/2 - 10 - scarfWave, -h/2 + 4, -w/2 - 14 - scarfWave, h/2 - 8);
-  ctx.quadraticCurveTo(-w/2 - 4, h/2 - 4, -w/2 + 2, h/2 - 14);
-  ctx.closePath();
-  ctx.fill();
-
-  // boots
-  ctx.fillStyle = '#4a3320';
-  ctx.fillRect(-w/2 + 1, h/2 - 5 + Math.max(0, -legSwing * 0.3), 9, 6);
-  ctx.fillRect(w/2 - 10, h/2 - 5 + Math.max(0, legSwing * 0.3), 9, 6);
-
-  // legs (dark trousers)
-  ctx.fillStyle = '#2e3b2a';
-  ctx.fillRect(-w/2 + 2, h/2 - 13, 8, 11 + legSwing * 0.3);
-  ctx.fillRect(w/2 - 10, h/2 - 13, 8, 11 - legSwing * 0.3);
-
-  // hands
-  ctx.fillStyle = '#ffe0c2';
-  ctx.beginPath();
-  ctx.arc(-w/2 - 1, 2 + legSwing * 0.4, 3.5, 0, Math.PI * 2);
-  ctx.arc(w/2 + 1, 2 - legSwing * 0.4, 3.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // long green coat
-  ctx.fillStyle = '#2f7d4f';
-  ctx.beginPath();
-  ctx.moveTo(-w/2, -h/2 + 8);
-  ctx.lineTo(-w/2 - 2, h/2 - 10);
-  ctx.lineTo(w/2 + 2, h/2 - 10);
-  ctx.lineTo(w/2, -h/2 + 8);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#3f9463';
-  ctx.fillRect(-w/2, -h/2 + 8, w, 6);
-
-  // scarf knot at the neck (in front)
-  ctx.fillStyle = '#e0a940';
-  ctx.beginPath();
-  ctx.arc(0, -h/2 + 10, 5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // head
-  ctx.fillStyle = '#ffe0c2';
-  ctx.fillRect(-w/2 + 4, -h/2 - 6, w - 8, 14);
-
-  // golden tousled hair
-  ctx.fillStyle = '#f0c04a';
-  ctx.beginPath();
-  ctx.moveTo(-w/2 + 3, -h/2 - 5);
-  ctx.lineTo(-w/2 + 1, -h/2 - 13);
-  ctx.lineTo(-w/2 + 6, -h/2 - 8);
-  ctx.lineTo(-w/2 + 8, -h/2 - 14);
-  ctx.lineTo(-w/2 + 11, -h/2 - 7);
-  ctx.lineTo(-w/2 + 14, -h/2 - 13);
-  ctx.lineTo(w/2 - 5, -h/2 - 9);
-  ctx.lineTo(w/2 - 3, -h/2 - 4);
-  ctx.closePath();
-  ctx.fill();
-
-  // eye
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(w/2 - 10, -h/2 - 2, 3, 3);
-
-  ctx.restore();
-}
-
-function drawHUDVignette() {
-  const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, canvas.height/2.2, canvas.width/2, canvas.height/2, canvas.height);
-  grad.addColorStop(0, 'rgba(0,0,0,0)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.25)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-}
-
-function draw() {
-  const t = Date.now();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawSky();
-  drawSun();
-  drawPlanets();
-  drawBirds(t);
-  drawMountains();
-  drawBackgroundHills();
-  drawRocks();
-  drawPlatforms();
-  stars.forEach(s => drawStar(s.x, s.y, s.taken, t));
-  drawEnemies(t);
-  drawGoalScene(t);
-  if (player.invuln <= 0 || Math.floor(t / 80) % 2 === 0) drawPlayer();
-  drawParticles();
-  drawHUDVignette();
+  let camFocusPx = Math.max(300, Math.min(WORLD_WIDTH - 300, player.x));
+  camera.position.set(sx(camFocusPx), CAMERA_HEIGHT, CAMERA_DIST);
+  camera.lookAt(sx(camFocusPx), LOOK_HEIGHT, 0);
 }
 
 function loop() {
   update();
-  draw();
+  syncScene(Date.now());
+  renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
 loop();

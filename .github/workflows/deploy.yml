@@ -7,6 +7,7 @@ on:
       - claude/practical-lamport-tm606n
     paths:
       - "mariominigame.html"
+      - "vendor/**"
   workflow_dispatch: {}
 
 jobs:
@@ -16,14 +17,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copy game file to server
+      - name: Copy game file and assets to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
           port: 22
-          source: "mariominigame.html"
+          source: "mariominigame.html,vendor/three.min.js"
           target: "/srv/www/p17"
           strip_components: 0
 
