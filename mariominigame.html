@@ -237,6 +237,7 @@
     justify-content: space-between;
     padding: 0 14px;
     pointer-events: none;
+    z-index: 3;
   }
   #touchControls[hidden] { display: none; }
   #touchControls .side { display: flex; gap: 12px; pointer-events: auto; }
@@ -551,7 +552,10 @@ let restartArmed = false;
 let restartArmTimeout = null;
 
 function startGame() {
-  if (gameState !== 'title') return;
+  // Checked here, once, so every entry point (keyboard, canvas/title click,
+  // touch jump button) is protected the same way without each call site
+  // having to remember to guard it separately.
+  if (gameState !== 'title' || !settingsPanel.hidden) return;
   gameState = 'playing';
   titleOverlay.classList.remove('visible');
   jumpKeyWasDown = true; // don't let the key that starts the game also count as a jump
@@ -565,16 +569,24 @@ function startGame() {
 window.addEventListener('keydown', e => {
   const key = e.key.toLowerCase();
   keys[key] = true;
-  if (e.key === ' ') e.preventDefault();
+  // Only preventDefault while the game itself should consume Space (i.e.
+  // settings isn't open) - otherwise this blocks the browser's native
+  // Space-to-activate behavior on the settings dialog's own checkboxes and
+  // Close button, which is exactly backwards for an accessibility panel.
+  if (e.key === ' ' && settingsPanel.hidden) e.preventDefault();
 
   if (key === 'escape' && !settingsPanel.hidden) {
     closeSettings();
     settingsBtn.focus();
   }
 
-  // Guarded on settingsPanel.hidden so adjusting settings before the first
-  // play (or just closing them again) can never accidentally launch a run.
-  if (gameState === 'title' && key !== 'r' && settingsPanel.hidden) {
+  // startGame() itself checks settingsPanel.hidden, so this only needs to
+  // exclude the keys that have their own explicit handling here: 'r' (goes
+  // through restart() below) and 'escape' (just closed settings above -
+  // without this exclusion, the same keypress would close settings THEN
+  // immediately start a run, since settingsPanel.hidden is already true by
+  // the time this line runs).
+  if (gameState === 'title' && key !== 'r' && key !== 'escape') {
     startGame();
   }
 
@@ -1118,6 +1130,7 @@ function showMessage(title, body) {
   msgTitle.textContent = title;
   msgBody.textContent = body;
   msgOverlay.classList.add('visible');
+  restartBtn.focus();
 }
 function hideMessage() {
   msgOverlay.classList.remove('visible');
