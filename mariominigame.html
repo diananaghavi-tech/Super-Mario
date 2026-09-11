@@ -226,7 +226,7 @@
     <div class="badge"><span class="icon">⭐</span><span>Stars: <span class="value" id="starCount">0</span>/<span id="starTotal">0</span></span></div>
     <div style="display:flex; align-items:center; gap:10px;">
       <div class="badge" id="hearts"><span class="icon heart">❤</span><span>Lives: <span class="value" id="lives">3</span></span></div>
-      <button id="muteBtn" class="mute-btn" type="button" aria-label="Mute music" aria-pressed="false">&#127925;</button>
+      <button id="muteBtn" class="mute-btn" type="button" aria-label="Mute music and sound effects" aria-pressed="false">&#127925;</button>
     </div>
   </div>
   <div id="canvasWrap">
@@ -273,6 +273,39 @@ muteBtn.addEventListener('click', () => {
   muteBtn.setAttribute('aria-pressed', String(bgm.muted));
 });
 
+// ---- Synthesized sound effects (tiny 8-bit-style blips, no audio files needed) ----
+let sfxCtx = null;
+function ensureSfxCtx() {
+  if (!sfxCtx) sfxCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (sfxCtx.state === 'suspended') sfxCtx.resume();
+  return sfxCtx;
+}
+function playTone(freq, startDelay, dur, type, vol, sweepTo) {
+  if (bgm.muted) return;
+  const ac = ensureSfxCtx();
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  const t0 = ac.currentTime + startDelay;
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (sweepTo) osc.frequency.exponentialRampToValueAtTime(sweepTo, t0 + dur);
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.03);
+}
+const sfx = {
+  jump: () => playTone(440, 0, 0.12, 'square', 0.16, 880),
+  doubleJump: () => playTone(660, 0, 0.1, 'square', 0.15, 1180),
+  collectStar: () => { playTone(988, 0, 0.08, 'square', 0.16); playTone(1319, 0.07, 0.14, 'square', 0.16); },
+  stomp: () => playTone(220, 0, 0.09, 'triangle', 0.2, 90),
+  hurt: () => playTone(180, 0, 0.16, 'sawtooth', 0.2, 80),
+  gameOver: () => [392, 349, 311, 261].forEach((f, i) => playTone(f, i * 0.16, 0.2, 'square', 0.18)),
+  win: () => [523, 659, 784, 1046].forEach((f, i) => playTone(f, i * 0.12, 0.18, 'square', 0.18)),
+  select: () => playTone(740, 0, 0.07, 'square', 0.14),
+};
+
 const GRAVITY = 0.6;
 const FRICTION = 0.8;
 const WALK_SPEED = 4;
@@ -293,6 +326,7 @@ function startGame() {
   titleOverlay.classList.remove('visible');
   jumpKeyWasDown = true; // don't let the key/click that starts the game also count as a jump
   bgm.play().catch(() => {}); // ignore autoplay rejection if it somehow fires outside a user gesture
+  sfx.select();
 }
 
 window.addEventListener('keydown', e => {
@@ -445,10 +479,12 @@ function update() {
       player.vy = JUMP_FORCE;
       player.onGround = false;
       player.jumpsUsed = 1;
+      sfx.jump();
     } else if (player.jumpsUsed < 2) {
       player.vy = DOUBLE_JUMP_FORCE;
       player.jumpsUsed = 2;
       spawnBurst(player.x - camX + player.w / 2, player.y + player.h / 2, '255, 255, 255');
+      sfx.doubleJump();
     }
   }
   jumpKeyWasDown = jumpPressed;
@@ -511,6 +547,7 @@ function update() {
         player.starsCollected++;
         starCountEl.textContent = player.starsCollected;
         spawnBurst(s.x - camX, s.y, '255, 215, 0');
+        sfx.collectStar();
       }
     }
   }
@@ -531,6 +568,7 @@ function update() {
         en.alive = false;
         player.vy = JUMP_FORCE * 0.55;
         spawnBurst(en.x - camX + en.w / 2, en.y, '120, 150, 70');
+        sfx.stomp();
       } else if (player.invuln <= 0) {
         const knockDir = (player.x + player.w / 2 < en.x + en.w / 2) ? -1 : 1;
         loseLife();
@@ -559,8 +597,10 @@ function loseLife() {
   livesEl.textContent = player.lives;
   if (player.lives <= 0) {
     gameState = 'dead';
+    sfx.gameOver();
     showMessage('GAME OVER', 'The journey ends here. Stars collected: ' + player.starsCollected + '/' + stars.length);
   } else {
+    sfx.hurt();
     resetPlayerPosition(player);
     player.invuln = 90;
   }
@@ -568,6 +608,7 @@ function loseLife() {
 
 function winGame() {
   gameState = 'won';
+  sfx.win();
   showMessage('HOME AT LAST', 'Your fox and your rose were waiting. You brought back ' + player.starsCollected + '/' + stars.length + ' stars.');
 }
 
@@ -591,6 +632,7 @@ function restart() {
   gameState = 'playing';
   titleOverlay.classList.remove('visible');
   hideMessage();
+  sfx.select();
 }
 
 const levelBgImg = new Image();
