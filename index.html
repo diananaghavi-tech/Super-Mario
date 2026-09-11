@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Little Prince - Jump & Collect Stars</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="gameWrap">
+  <div id="hud">
+    <div class="badge"><span class="icon">⭐</span><span>Stars: <span class="value" id="starCount">0</span>/<span id="starTotal">0</span></span></div>
+    <div class="badge" id="hearts"><span class="icon heart">❤</span><span>Lives: <span class="value" id="lives">3</span></span></div>
+  </div>
+  <div id="canvasWrap">
+    <canvas id="game" width="800" height="450"></canvas>
+    <div id="titleOverlay" class="overlay visible">
+      <div class="card">
+        <h1>THE LITTLE PRINCE</h1>
+        <p>Jump across platforms, stomp goombas, dodge the pits,<br>grab mushrooms, and collect every star before the flag.</p>
+        <p><span class="kbd">&larr;</span><span class="kbd">&rarr;</span> or <span class="kbd">A</span><span class="kbd">D</span> to move &middot; <span class="kbd">Shift</span> to run</p>
+        <p><span class="kbd">Space</span> to jump &middot; tap it again in mid-air to double jump</p>
+        <p class="big">Press any key to start</p>
+      </div>
+    </div>
+    <div id="msgOverlay" class="overlay">
+      <div class="card">
+        <h1 id="msgTitle">GAME OVER</h1>
+        <p id="msgBody"></p>
+        <form id="scoreForm" class="score-form">
+          <input id="playerNameInput" type="text" maxlength="20" placeholder="Your name" autocomplete="off" required>
+          <button type="submit">Save Score</button>
+        </form>
+        <p id="scoreStatus" class="score-status"></p>
+        <div class="leaderboard">
+          <h2>Top Scores</h2>
+          <ol id="leaderboardList"></ol>
+        </div>
+        <p class="big">Press <span class="kbd">R</span> to restart</p>
+      </div>
+    </div>
+  </div>
+  <div id="controls">&larr; &rarr; or A/D to move &middot; Shift to run &middot; Space / &uarr; / W to jump (tap again to double jump) &middot; R to restart</div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
