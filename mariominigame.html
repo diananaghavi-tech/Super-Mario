@@ -472,7 +472,7 @@ const MUSIC_BASS   = [196, 196, 247, 247, 262, 262, 247, 247, 220, 220, 196, 196
 let musicTimer = null;
 let musicStep = 0;
 function scheduleMusicStep() {
-  if (!audioCtx || settings.muted || gameState !== 'playing') return;
+  if (!audioCtx || settings.muted || gameState !== 'playing' || paused) return;
   tone(MUSIC_MELODY[musicStep % MUSIC_MELODY.length], 0.22, 'triangle', 0.05, null);
   tone(MUSIC_BASS[musicStep % MUSIC_BASS.length], 0.28, 'sine', 0.04, null);
   musicStep++;
@@ -526,7 +526,12 @@ function refreshBestLine() {
 const GRAVITY = 0.6;
 const FRICTION = 0.8;
 const WALK_SPEED = 4;
-const RUN_SPEED = 7.5;
+// The horizontal accel/friction formula below converges to a geometric
+// steady-state of accel*FRICTION/(1-FRICTION); with the run accel (1.6) and
+// FRICTION (0.8) used there, that's exactly 6.4, so this is set to match
+// what's actually reachable rather than a higher number the physics can
+// never produce.
+const RUN_SPEED = 6.4;
 const JUMP_FORCE = -12.5;
 const DOUBLE_JUMP_FORCE = -10.5;
 const STOMP_OVERLAP_PX = 14;   // leniency (px) when checking if the player's feet were above an enemy's top before this frame's move, to count as a stomp rather than a side hit
@@ -563,13 +568,13 @@ window.addEventListener('keydown', e => {
   if (e.key === ' ') e.preventDefault();
 
   if (key === 'escape' && !settingsPanel.hidden) {
-    settingsPanel.hidden = true;
-    settingsBtn.setAttribute('aria-expanded', 'false');
+    closeSettings();
     settingsBtn.focus();
-    if (paused) { paused = false; startTimer(); }
   }
 
-  if (gameState === 'title' && key !== 'r') {
+  // Guarded on settingsPanel.hidden so adjusting settings before the first
+  // play (or just closing them again) can never accidentally launch a run.
+  if (gameState === 'title' && key !== 'r' && settingsPanel.hidden) {
     startGame();
   }
 
@@ -607,6 +612,15 @@ titleOverlay.addEventListener('click', () => {
 });
 
 // ===== Settings UI wiring =====
+// Single source of truth for closing the panel: every path that can close it
+// (Escape, the Close button, toggling it shut, and restart() forcing it shut)
+// goes through this so the paused flag and the panel's visible/ARIA state can
+// never drift apart from each other.
+function closeSettings() {
+  settingsPanel.hidden = true;
+  settingsBtn.setAttribute('aria-expanded', 'false');
+  if (paused) { paused = false; startTimer(); }
+}
 muteBtn.addEventListener('click', () => {
   ensureAudio();
   settings.muted = !settings.muted;
@@ -614,22 +628,18 @@ muteBtn.addEventListener('click', () => {
   applySettingsToUI();
 });
 settingsBtn.addEventListener('click', () => {
-  const willOpen = settingsPanel.hidden;
-  settingsPanel.hidden = !willOpen;
-  settingsBtn.setAttribute('aria-expanded', String(willOpen));
-  if (willOpen) {
+  if (settingsPanel.hidden) {
+    settingsPanel.hidden = false;
+    settingsBtn.setAttribute('aria-expanded', 'true');
     optReducedMotion.focus();
     if (gameState === 'playing' && !paused) { paused = true; stopTimer(); }
-  } else if (paused) {
-    paused = false;
-    startTimer();
+  } else {
+    closeSettings();
   }
 });
 closeSettingsBtn.addEventListener('click', () => {
-  settingsPanel.hidden = true;
-  settingsBtn.setAttribute('aria-expanded', 'false');
+  closeSettings();
   settingsBtn.focus();
-  if (paused) { paused = false; startTimer(); }
 });
 settingsPanel.addEventListener('keydown', e => {
   if (e.key !== 'Tab') return;
@@ -1114,7 +1124,7 @@ function hideMessage() {
 }
 
 function restart() {
-  paused = false;
+  closeSettings(); // in case a restart is triggered while settings happens to be open
   checkpoints.forEach(cp => cp.reached = false);
   spawnPoint = { x: 40, y: 300 };
   player = createPlayer();
