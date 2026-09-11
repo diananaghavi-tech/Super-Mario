@@ -144,8 +144,9 @@
     <div id="titleOverlay" class="overlay visible">
       <div class="card">
         <h1>MINI MARIO</h1>
-        <p>Jump across platforms, dodge the pits,<br>and collect every star before the flag.</p>
-        <p><span class="kbd">&larr;</span><span class="kbd">&rarr;</span> or <span class="kbd">A</span><span class="kbd">D</span> to move &middot; <span class="kbd">Space</span> to jump</p>
+        <p>Jump across platforms, stomp goombas, dodge the pits,<br>grab mushrooms, and collect every star before the flag.</p>
+        <p><span class="kbd">&larr;</span><span class="kbd">&rarr;</span> or <span class="kbd">A</span><span class="kbd">D</span> to move &middot; <span class="kbd">Shift</span> to run</p>
+        <p><span class="kbd">Space</span> to jump &middot; tap it again in mid-air to double jump</p>
         <p class="big">Press any key to start</p>
       </div>
     </div>
@@ -157,7 +158,7 @@
       </div>
     </div>
   </div>
-  <div id="controls">&larr; &rarr; or A/D to move &middot; Space / &uarr; / W to jump &middot; R to restart</div>
+  <div id="controls">&larr; &rarr; or A/D to move &middot; Shift to run &middot; Space / &uarr; / W to jump (tap again to double jump) &middot; R to restart</div>
 </div>
 
 <script>
@@ -173,8 +174,10 @@ const msgBody = document.getElementById('msgBody');
 
 const GRAVITY = 0.6;
 const FRICTION = 0.8;
-const MOVE_SPEED = 4;
+const WALK_SPEED = 4;
+const RUN_SPEED = 7.5;
 const JUMP_FORCE = -12.5;
+const DOUBLE_JUMP_FORCE = -10.5;
 
 // World is wider than the canvas; camera scrolls horizontally.
 const WORLD_WIDTH = 2400;
@@ -188,6 +191,7 @@ window.addEventListener('keydown', e => {
   if (gameState === 'title' && e.key.toLowerCase() !== 'r') {
     gameState = 'playing';
     titleOverlay.classList.remove('visible');
+    jumpKeyWasDown = true; // don't let the key that starts the game also count as a jump
   }
   if (e.key.toLowerCase() === 'r') restart();
 });
@@ -242,28 +246,72 @@ let stars = [
 ];
 starTotalEl.textContent = stars.length;
 
+// Mushrooms: grow the player and grant one hit of protection against enemies
+let mushrooms = [
+  { x: 190, y: GROUND_Y - 20, taken: false },
+  { x: 950, y: GROUND_Y - 20, taken: false },
+  { x: 1420, y: 270, taken: false },
+  { x: 2000, y: GROUND_Y - 20, taken: false },
+];
+
+// Goombas that patrol a fixed range and must be jumped on or avoided
+const PLAYER_SMALL = { w: 28, h: 36 };
+const PLAYER_BIG = { w: 30, h: 48 };
+const ENEMY_SPEED = 1.3;
+function makeEnemies() {
+  return [
+    { x: 300, y: GROUND_Y - 24, w: 24, h: 24, minX: 260, maxX: 460, vx: ENEMY_SPEED, alive: true },
+    { x: 950, y: GROUND_Y - 24, w: 24, h: 24, minX: 910, maxX: 1260, vx: ENEMY_SPEED, alive: true },
+    { x: 1420, y: GROUND_Y - 24, w: 24, h: 24, minX: 1390, maxX: 1650, vx: -ENEMY_SPEED, alive: true },
+    { x: 1900, y: GROUND_Y - 24, w: 24, h: 24, minX: 1780, maxX: 2350, vx: ENEMY_SPEED, alive: true },
+  ];
+}
+let enemies = makeEnemies();
+
 // Simple flagpole goal at the end
 const goal = { x: 2350, y: 250, w: 20, h: 150 };
 
 let camX = 0;
 let gameState = 'title'; // title, playing, won, dead
 let particles = [];
+let jumpKeyWasDown = false;
 
 function createPlayer() {
   return {
-    x: 40, y: 300, w: 28, h: 36,
+    x: 40, y: 300, w: PLAYER_SMALL.w, h: PLAYER_SMALL.h,
     vx: 0, vy: 0,
     onGround: false,
     facing: 1,
     starsCollected: 0,
     lives: 3,
     walkPhase: 0,
+    jumpsUsed: 0,
+    big: false,
+    invuln: 0,
   };
 }
 let player = createPlayer();
 
 function resetPlayerPosition(p) {
   p.x = 40; p.y = 300; p.vx = 0; p.vy = 0;
+}
+
+function growPlayer(p) {
+  if (p.big) return;
+  p.big = true;
+  const oldH = p.h;
+  p.w = PLAYER_BIG.w;
+  p.h = PLAYER_BIG.h;
+  p.y -= (p.h - oldH);
+}
+
+function shrinkPlayer(p) {
+  if (!p.big) return;
+  p.big = false;
+  const oldH = p.h;
+  p.w = PLAYER_SMALL.w;
+  p.h = PLAYER_SMALL.h;
+  p.y += (oldH - p.h);
 }
 
 function rectsOverlap(a, b) {
@@ -296,28 +344,40 @@ function updateParticles() {
 function update() {
   if (gameState !== 'playing') { updateParticles(); return; }
 
+  const running = keys['shift'];
+  const maxSpeed = running ? RUN_SPEED : WALK_SPEED;
+
   // Horizontal input
   let moving = false;
   if (keys['arrowleft'] || keys['a']) {
-    player.vx -= 1;
+    player.vx -= running ? 1.6 : 1;
     player.facing = -1;
     moving = true;
   }
   if (keys['arrowright'] || keys['d']) {
-    player.vx += 1;
+    player.vx += running ? 1.6 : 1;
     player.facing = 1;
     moving = true;
   }
   player.vx *= FRICTION;
-  if (Math.abs(player.vx) > MOVE_SPEED) player.vx = MOVE_SPEED * Math.sign(player.vx);
+  if (Math.abs(player.vx) > maxSpeed) player.vx = maxSpeed * Math.sign(player.vx);
 
-  if (moving && player.onGround) player.walkPhase += 0.35;
+  if (moving && player.onGround) player.walkPhase += running ? 0.55 : 0.35;
 
-  // Jump
-  if ((keys['arrowup'] || keys['w'] || keys[' ']) && player.onGround) {
-    player.vy = JUMP_FORCE;
-    player.onGround = false;
+  // Jump / double jump (edge-triggered so holding the key doesn't chain-jump)
+  const jumpPressed = keys['arrowup'] || keys['w'] || keys[' '];
+  if (jumpPressed && !jumpKeyWasDown) {
+    if (player.onGround) {
+      player.vy = JUMP_FORCE;
+      player.onGround = false;
+      player.jumpsUsed = 1;
+    } else if (player.jumpsUsed < 2) {
+      player.vy = DOUBLE_JUMP_FORCE;
+      player.jumpsUsed = 2;
+      spawnBurst(player.x - camX + player.w / 2, player.y + player.h / 2, '255, 255, 255');
+    }
   }
+  jumpKeyWasDown = jumpPressed;
 
   // Gravity
   player.vy += GRAVITY;
@@ -349,6 +409,7 @@ function update() {
         player.y = p.y - player.h;
         player.vy = 0;
         player.onGround = true;
+        player.jumpsUsed = 0;
       } else if (player.vy < 0) {
         // hit head
         player.y = p.y + p.h;
@@ -380,6 +441,50 @@ function update() {
     }
   }
 
+  // Mushroom collection - grows the player and grants a hit of protection
+  for (const m of mushrooms) {
+    if (!m.taken) {
+      const mBox = { x: m.x - 12, y: m.y - 12, w: 24, h: 24 };
+      if (rectsOverlap(player, mBox)) {
+        m.taken = true;
+        growPlayer(player);
+        spawnBurst(m.x - camX, m.y, '220, 60, 60');
+      }
+    }
+  }
+
+  if (player.invuln > 0) player.invuln--;
+
+  // Enemies: patrol, get stomped from above, or damage the player on contact
+  for (const en of enemies) {
+    if (!en.alive) continue;
+    en.x += en.vx;
+    if (en.x < en.minX) { en.x = en.minX; en.vx = Math.abs(en.vx); }
+    if (en.x + en.w > en.maxX) { en.x = en.maxX - en.w; en.vx = -Math.abs(en.vx); }
+
+    if (rectsOverlap(player, en)) {
+      const stomping = player.vy > 0 && (player.y + player.h - en.y) < 14;
+      if (stomping) {
+        en.alive = false;
+        player.vy = JUMP_FORCE * 0.55;
+        spawnBurst(en.x - camX + en.w / 2, en.y, '150, 100, 60');
+      } else if (player.invuln <= 0) {
+        const knockDir = (player.x + player.w / 2 < en.x + en.w / 2) ? -1 : 1;
+        if (player.big) {
+          shrinkPlayer(player);
+          player.invuln = 90;
+          player.vx = knockDir * 6;
+          player.vy = -6;
+        } else {
+          loseLife();
+          player.invuln = 90;
+          player.vx = knockDir * 6;
+          player.vy = -6;
+        }
+      }
+    }
+  }
+
   // Goal check
   if (rectsOverlap(player, goal)) {
     winGame();
@@ -401,6 +506,8 @@ function loseLife() {
     showMessage('GAME OVER', 'You ran out of lives. Stars collected: ' + player.starsCollected + '/' + stars.length);
   } else {
     resetPlayerPosition(player);
+    shrinkPlayer(player);
+    player.invuln = 90;
   }
 }
 
@@ -421,9 +528,12 @@ function hideMessage() {
 function restart() {
   player = createPlayer();
   stars.forEach(s => s.taken = false);
+  mushrooms.forEach(m => m.taken = false);
+  enemies = makeEnemies();
   starCountEl.textContent = 0;
   livesEl.textContent = player.lives;
   particles = [];
+  jumpKeyWasDown = false;
   gameState = 'playing';
   titleOverlay.classList.remove('visible');
   hideMessage();
@@ -692,6 +802,69 @@ function drawParticles() {
   }
 }
 
+function drawMushroom(x, y, taken) {
+  if (taken) return;
+  const drawX = x - camX;
+  if (drawX < -30 || drawX > canvas.width + 30) return;
+  ctx.save();
+  ctx.translate(drawX, y);
+  // stem
+  ctx.fillStyle = '#f3e0c0';
+  ctx.fillRect(-6, 2, 12, 10);
+  // cap
+  ctx.fillStyle = '#e0333f';
+  ctx.beginPath();
+  ctx.arc(0, 0, 12, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(-6, -5, 2.6, 0, Math.PI * 2);
+  ctx.arc(6, -5, 2.6, 0, Math.PI * 2);
+  ctx.arc(0, -9, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawEnemies() {
+  for (const en of enemies) {
+    if (!en.alive) continue;
+    const drawX = en.x - camX;
+    if (drawX + en.w < 0 || drawX > canvas.width) continue;
+    ctx.save();
+    ctx.translate(drawX + en.w / 2, en.y + en.h / 2);
+    // body
+    ctx.fillStyle = '#8b5a2b';
+    ctx.beginPath();
+    ctx.arc(0, 0, en.w / 2, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = '#c9986a';
+    ctx.fillRect(-en.w / 2, 0, en.w, en.h / 2 - 2);
+    // feet
+    ctx.fillStyle = '#3b2313';
+    ctx.fillRect(-en.w / 2, en.h / 2 - 4, 8, 4);
+    ctx.fillRect(en.w / 2 - 8, en.h / 2 - 4, 8, 4);
+    // eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(-4, -2, 3, 0, Math.PI * 2);
+    ctx.arc(4, -2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(-4, -1, 1.4, 0, Math.PI * 2);
+    ctx.arc(4, -1, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+    // angry brows
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-7, -6); ctx.lineTo(-1, -4);
+    ctx.moveTo(7, -6); ctx.lineTo(1, -4);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawGoalFlag() {
   const drawX = goal.x - camX;
   ctx.fillStyle = '#cccccc';
@@ -818,8 +991,10 @@ function draw() {
   drawCastle();
   drawPlatforms();
   stars.forEach(s => drawStar(s.x, s.y, s.taken, t));
+  mushrooms.forEach(m => drawMushroom(m.x, m.y, m.taken));
+  drawEnemies();
   drawGoalFlag();
-  drawPlayer();
+  if (player.invuln <= 0 || Math.floor(t / 80) % 2 === 0) drawPlayer();
   drawParticles();
   drawHUDVignette();
 }
