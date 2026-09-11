@@ -123,6 +123,10 @@
     background: rgba(5, 10, 25, 0.55);
     border-radius: 10px;
     backdrop-filter: blur(2px);
+    /* Above touchControls (3) and toast (4) so the title/game-over card is
+       never visually obscured by them on touch devices, but below the
+       settings dialog (6) since that opens on top of any of these. */
+    z-index: 5;
   }
   .overlay.visible { display: flex; }
   .card {
@@ -330,7 +334,7 @@
         <p class="best" id="bestLine" style="display:none;"></p>
       </div>
     </div>
-    <div id="msgOverlay" class="overlay">
+    <div id="msgOverlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="msgTitle" aria-describedby="msgBody">
       <div class="card">
         <h1 id="msgTitle">GAME OVER</h1>
         <p id="msgBody"></p>
@@ -575,6 +579,12 @@ function startGame() {
   announce('Game started.');
 }
 
+// Keys that must never be treated as "press any key to start" on the title
+// screen: they're either pure navigation/modifier keys a keyboard user needs
+// to reach the mute/settings buttons (Tab and friends), or keys with their
+// own explicit handling elsewhere in this listener (r, escape).
+const NON_START_KEYS = new Set(['r', 'escape', 'tab', 'shift', 'control', 'alt', 'meta', 'capslock', 'contextmenu']);
+
 window.addEventListener('keydown', e => {
   const key = e.key.toLowerCase();
   keys[key] = true;
@@ -590,16 +600,22 @@ window.addEventListener('keydown', e => {
   }
 
   // startGame() itself checks settingsPanel.hidden, so this only needs to
-  // exclude the keys that have their own explicit handling here: 'r' (goes
-  // through restart() below) and 'escape' (just closed settings above -
-  // without this exclusion, the same keypress would close settings THEN
-  // immediately start a run, since settingsPanel.hidden is already true by
-  // the time this line runs).
-  if (gameState === 'title' && key !== 'r' && key !== 'escape') {
+  // exclude NON_START_KEYS (see above) plus Enter/Space specifically when
+  // they're aimed at a focused button (their native activation keys) -
+  // otherwise Tabbing to the mute/settings buttons, or activating one with
+  // Enter/Space, would ALSO start the run as a side effect of the same
+  // keystroke. Deliberately narrow (not "any key while a button has focus"):
+  // a button keeping focus after being activated shouldn't then block an
+  // unrelated key like an arrow from starting the game on the next press.
+  const isButtonActivationKey = (key === 'enter' || key === ' ') && e.target && e.target.tagName === 'BUTTON';
+  if (gameState === 'title' && !NON_START_KEYS.has(key) && !isButtonActivationKey) {
     startGame();
   }
 
-  if (key === 'r') {
+  // Gated behind settingsPanel.hidden, matching Escape/Space above - R must
+  // not be able to force-close the settings modal and restart from inside
+  // what's supposed to be a fully input-trapped dialog.
+  if (key === 'r' && settingsPanel.hidden) {
     if (gameState === 'playing') {
       // Restarting mid-run wipes lives/stars/time, so require a second press
       // within a short window instead of restarting on a single stray keypress.
@@ -623,6 +639,12 @@ window.addEventListener('keydown', e => {
   }
 });
 window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+// A key held down when the window/tab loses focus (e.g. alt-tabbing away)
+// never gets a matching keyup, so without this it would stay "held" in the
+// `keys` map indefinitely and keep moving the player with nobody touching
+// the keyboard. Mirrors the same stray-key concern startGame()/restart()
+// already guard against, but for focus loss during an ongoing run.
+window.addEventListener('blur', () => { keys = {}; });
 canvas.addEventListener('click', () => {
   if (gameState === 'title') startGame();
 });
@@ -643,13 +665,27 @@ function closeSettings() {
   settingsBtn.setAttribute('aria-expanded', 'false');
   if (paused) { paused = false; startTimer(); }
 }
+// Elements that sit outside every modal overlay this game has (the settings
+// panel and the win/game-over message card) - shared by both of the
+// inert-toggling helpers below so they can't drift out of sync with each
+// other as new background elements get added.
+const MODAL_BACKGROUND_ELS = [hudEl, progressBarWrapEl, canvas, touchControls, toastEl, controlsEl];
 // Marks everything outside the settings dialog `inert` while it's open, so
 // it's a real accessibility-tree modal (screen-reader browse-mode users
 // can't wander into background content) rather than just visually/
 // keyboard-Tab blocked. Removed again before focus returns to settingsBtn
 // on close.
 function setBackgroundInert(on) {
-  [hudEl, progressBarWrapEl, canvas, touchControls, toastEl, titleOverlay, msgOverlay, controlsEl].forEach(el => {
+  [...MODAL_BACKGROUND_ELS, titleOverlay, msgOverlay].forEach(el => {
+    if (!el) return;
+    if (on) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+  });
+}
+// Same idea as setBackgroundInert(), but for the win/game-over message card:
+// makes it a true accessibility-tree modal too (msgOverlay stays out of the
+// inert set here since it's the dialog itself, not part of its background).
+function setBackgroundInertForMessage(on) {
+  [...MODAL_BACKGROUND_ELS, titleOverlay].forEach(el => {
     if (!el) return;
     if (on) el.setAttribute('inert', ''); else el.removeAttribute('inert');
   });
@@ -744,6 +780,11 @@ const platforms = [
   // moving platform: an alternate, timing-based way across the pit at 1300-1380
   { x: 1310, y: 280, w: 70, h: 16, moving: true, axis: 'y', min: 230, max: 330, speed: 0.9, dir: 1 },
 ];
+
+// Snapshot of each moving platform's authored starting position, so restart()
+// can put it back exactly where the level defines it rather than wherever it
+// happened to have drifted to at the moment of restart.
+const movingPlatformStart = platforms.filter(p => p.moving).map(p => ({ p, y: p.y, dir: p.dir }));
 
 // Gaps (pits) - defined as x ranges where there's no ground so falling = death
 const pits = [
@@ -889,6 +930,7 @@ function updateMovingPlatforms(dt) {
     if (!p.moving) continue;
     if (p.axis === 'y') {
       const prevPY = p.y;
+      p.prevY = prevPY; // read by update()'s landing check below
       p.y += p.dir * p.speed * dt;
       if (p.y <= p.min) { p.y = p.min; p.dir = 1; }
       if (p.y >= p.max) { p.y = p.max; p.dir = -1; }
@@ -985,8 +1027,17 @@ function update(dt) {
   player.y += player.vy * dt;
   for (const p of platforms) {
     if (rectsOverlap(player, p)) {
-      const wasAbove = prevY + player.h <= p.y;
-      const wasBelow = prevY >= p.y + p.h;
+      // For a platform that moved this frame, compare against where it WAS
+      // before its own move rather than where it ended up: updateMovingPlatforms()
+      // already ran this frame (line ~910, before player movement), so a
+      // platform moving upward has already "consumed" some of its own gap to
+      // the player before we ever check who approached whom. Using its
+      // post-move position here would make the approach check stricter than
+      // it should be and can miss a legitimate landing entirely - the player
+      // falls straight through a platform rising to meet them.
+      const refY = (p.moving && p.axis === 'y' && p.prevY !== undefined) ? p.prevY : p.y;
+      const wasAbove = prevY + player.h <= refY;
+      const wasBelow = prevY >= refY + p.h;
       if (player.vy > 0 && wasAbove) {
         player.y = p.y - player.h;
         player.vy = 0;
@@ -1046,9 +1097,15 @@ function update(dt) {
     }
   }
 
-  // Checkpoints - move the respawn point forward once touched
+  // Checkpoints - move the respawn point forward once touched. Hit-tested
+  // against a full-height sensor column (not the short drawn flagpole rect)
+  // since a normal running jump clears the preceding pit well above the
+  // pole's own height and would otherwise sail over it unnoticed - the
+  // sensor only needs to catch any horizontal pass through the pole's x
+  // position, regardless of how high the player is at that moment.
   for (const cp of checkpoints) {
-    if (!cp.reached && rectsOverlap(player, cp)) {
+    const sensor = { x: cp.x - 10, y: 0, w: cp.w + 20, h: GROUND_Y };
+    if (!cp.reached && rectsOverlap(player, sensor)) {
       cp.reached = true;
       spawnPoint = { x: cp.x, y: 300 };
       SFX.checkpoint();
@@ -1152,16 +1209,26 @@ function showMessage(title, body) {
   msgTitle.textContent = title;
   msgBody.textContent = body;
   msgOverlay.classList.add('visible');
+  setBackgroundInertForMessage(true);
   restartBtn.focus();
 }
 function hideMessage() {
   msgOverlay.classList.remove('visible');
+  setBackgroundInertForMessage(false);
 }
+// restartBtn is the only focusable element inside the message card, so
+// trapping Tab here just means it never leaves - keeps a screen-reader or
+// keyboard user from tabbing out into the (inert, but still worth not
+// relying on that alone for) background while the card is up.
+msgOverlay.addEventListener('keydown', e => {
+  if (e.key === 'Tab') { e.preventDefault(); restartBtn.focus(); }
+});
 
 function restart() {
   closeSettings(); // in case a restart is triggered while settings happens to be open
   keys = {}; // same rationale as in startGame() - don't carry stray held keys into the new run
   checkpoints.forEach(cp => cp.reached = false);
+  movingPlatformStart.forEach(({ p, y, dir }) => { p.y = y; p.dir = dir; p.prevY = undefined; });
   spawnPoint = { x: 40, y: 300 };
   player = createPlayer();
   stars.forEach(s => s.taken = false);
@@ -1676,7 +1743,10 @@ function draw() {
   mushrooms.forEach(m => drawMushroom(m.x, m.y, m.taken));
   drawEnemies();
   drawGoalFlag();
-  if (player.invuln <= 0 || Math.floor(t / 80) % 2 === 0) drawPlayer();
+  // Unlike every other animated effect in this file, this flicker didn't
+  // check reducedMotion - a fast flash is exactly the kind of thing that
+  // setting exists to suppress, so when it's on just draw the player solidly.
+  if (player.invuln <= 0 || settings.reducedMotion || Math.floor(t / 80) % 2 === 0) drawPlayer();
   drawParticles();
   drawHUDVignette();
   updateTimerDisplay();
