@@ -301,7 +301,7 @@
   <div id="progressBarWrap" aria-hidden="true"><div id="progressBarFill"></div></div>
   <div id="canvasWrap">
     <canvas id="game" width="800" height="450" role="img" aria-label="The Little Prince platformer game viewport"></canvas>
-    <div id="settingsPanel" role="dialog" aria-label="Settings" hidden>
+    <div id="settingsPanel" role="dialog" aria-modal="true" aria-label="Settings" hidden>
       <label><input type="checkbox" id="optReducedMotion"> Reduce motion</label>
       <label><input type="checkbox" id="optTouch"> Show touch controls</label>
       <label>Volume <input type="range" id="optVolume" min="0" max="100" value="80" aria-label="Volume"></label>
@@ -333,6 +333,7 @@
       <div class="card">
         <h1 id="msgTitle">GAME OVER</h1>
         <p id="msgBody"></p>
+        <p class="best" id="msgBestLine"></p>
         <p class="big">Press <span class="kbd">R</span> to restart</p>
         <button id="restartBtn" class="restartBtn" type="button">Restart</button>
       </div>
@@ -352,6 +353,7 @@ const titleOverlay = document.getElementById('titleOverlay');
 const msgOverlay = document.getElementById('msgOverlay');
 const msgTitle = document.getElementById('msgTitle');
 const msgBody = document.getElementById('msgBody');
+const msgBestLine = document.getElementById('msgBestLine');
 const bestLine = document.getElementById('bestLine');
 const timerDisplay = document.getElementById('timerDisplay');
 const progressFill = document.getElementById('progressBarFill');
@@ -514,12 +516,10 @@ function updateTimerDisplay() {
 }
 function refreshBestLine() {
   const best = loadBest();
-  if (best) {
-    bestLine.style.display = '';
-    bestLine.textContent = 'Best: ' + best.stars + '/' + stars.length + ' stars · ' + formatTime(best.timeMs);
-  } else {
-    bestLine.style.display = 'none';
-  }
+  const text = best ? ('Best: ' + best.stars + '/' + stars.length + ' stars · ' + formatTime(best.timeMs)) : '';
+  bestLine.style.display = best ? '' : 'none';
+  bestLine.textContent = text;
+  msgBestLine.textContent = text;
 }
 
 // ===== Tunable physics/gameplay constants =====
@@ -566,6 +566,7 @@ window.addEventListener('keydown', e => {
     settingsPanel.hidden = true;
     settingsBtn.setAttribute('aria-expanded', 'false');
     settingsBtn.focus();
+    if (paused) { paused = false; startTimer(); }
   }
 
   if (gameState === 'title' && key !== 'r') {
@@ -599,6 +600,11 @@ window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 canvas.addEventListener('click', () => {
   if (gameState === 'title') startGame();
 });
+// The title overlay sits on top of (and fully covers) the canvas while
+// visible, so it - not the canvas - is what actually receives the click.
+titleOverlay.addEventListener('click', () => {
+  if (gameState === 'title') startGame();
+});
 
 // ===== Settings UI wiring =====
 muteBtn.addEventListener('click', () => {
@@ -611,12 +617,31 @@ settingsBtn.addEventListener('click', () => {
   const willOpen = settingsPanel.hidden;
   settingsPanel.hidden = !willOpen;
   settingsBtn.setAttribute('aria-expanded', String(willOpen));
-  if (willOpen) optReducedMotion.focus();
+  if (willOpen) {
+    optReducedMotion.focus();
+    if (gameState === 'playing' && !paused) { paused = true; stopTimer(); }
+  } else if (paused) {
+    paused = false;
+    startTimer();
+  }
 });
 closeSettingsBtn.addEventListener('click', () => {
   settingsPanel.hidden = true;
   settingsBtn.setAttribute('aria-expanded', 'false');
   settingsBtn.focus();
+  if (paused) { paused = false; startTimer(); }
+});
+settingsPanel.addEventListener('keydown', e => {
+  if (e.key !== 'Tab') return;
+  const focusables = [optReducedMotion, optTouch, optVolume, closeSettingsBtn];
+  const first = focusables[0], last = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
 });
 optReducedMotion.addEventListener('change', () => {
   settings.reducedMotion = optReducedMotion.checked;
@@ -736,6 +761,7 @@ const goal = { x: 2350, y: 250, w: 20, h: 150 };
 
 let camX = 0;
 let gameState = 'title'; // title, playing, won, dead
+let paused = false; // true while the settings panel is open during active play
 let particles = [];
 let jumpKeyWasDown = false;
 let lifeLostThisFrame = false;
@@ -833,7 +859,7 @@ function updateMovingPlatforms(dt) {
 }
 
 function update(dt) {
-  if (gameState !== 'playing') { updateParticles(dt); return; }
+  if (gameState !== 'playing' || paused) { updateParticles(dt); return; }
   lifeLostThisFrame = false;
   const t = Date.now();
 
@@ -887,6 +913,12 @@ function update(dt) {
   // Gravity
   player.vy += GRAVITY * dt;
   if (player.vy > 15) player.vy = 15;
+  // Captured before this frame's collision resolution, which can zero
+  // player.vy (e.g. landing on the ground) before the enemy-stomp check
+  // below would otherwise read it - without this, a fall that reaches
+  // ground level and an enemy in the same frame gets misclassified as a
+  // side hit instead of a stomp.
+  const wasFalling = player.vy > 0;
 
   // Move horizontally then resolve collisions based on which side the player
   // approached from (rather than an arbitrary overlap-depth threshold, which
@@ -949,16 +981,23 @@ function update(dt) {
     }
   }
 
-  // Mushroom collection - grows the player and grants a hit of protection
+  // Mushroom collection - grows the player and grants a hit of protection.
+  // If already big, growPlayer() would be a silent no-op, so grant a brief
+  // invulnerability cushion instead so the pickup is never wasted.
   for (const m of mushrooms) {
     if (!m.taken) {
       const mBox = { x: m.x - 12, y: m.y - 12, w: 24, h: 24 };
       if (rectsOverlap(player, mBox)) {
         m.taken = true;
-        growPlayer(player);
         spawnBurst(m.x, m.y, '220, 60, 60');
         SFX.mushroom();
-        announce('Power mushroom collected! You grew bigger.');
+        if (player.big) {
+          player.invuln = Math.max(player.invuln, 45);
+          announce('Mushroom collected! Brief shield granted.');
+        } else {
+          growPlayer(player);
+          announce('Power mushroom collected! You grew bigger.');
+        }
       }
     }
   }
@@ -991,7 +1030,7 @@ function update(dt) {
       // platform collision above) rather than how deep the overlap ended up,
       // so a fast fall can't "outrun" the stomp check and get misclassified
       // as a side hit.
-      const stomping = player.vy > 0 && (prevY + player.h <= en.y + STOMP_OVERLAP_PX);
+      const stomping = wasFalling && (prevY + player.h <= en.y + STOMP_OVERLAP_PX);
       if (stomping) {
         en.alive = false;
         player.vy = JUMP_FORCE * STOMP_BOUNCE;
@@ -1040,7 +1079,9 @@ function loseLife() {
     SFX.gameOver();
     showMessage('GAME OVER', 'You ran out of lives. Stars collected: ' + player.starsCollected + '/' + stars.length + ' · Time: ' + formatTime(elapsedMs));
     announce('Game over. You ran out of lives.');
+    refreshBestLine();
   } else {
+    hideToast();
     resetPlayerPosition(player);
     shrinkPlayer(player);
     player.invuln = INVULN_FRAMES;
@@ -1073,6 +1114,7 @@ function hideMessage() {
 }
 
 function restart() {
+  paused = false;
   checkpoints.forEach(cp => cp.reached = false);
   spawnPoint = { x: 40, y: 300 };
   player = createPlayer();
