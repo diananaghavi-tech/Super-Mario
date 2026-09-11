@@ -3,14 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <title>Mini Mario - Jump & Collect Stars</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --panel-bg: rgba(10, 20, 40, 0.55);
+    --panel-border: rgba(255, 255, 255, 0.18);
+    --gold: #ffd700;
+    --accent: #ff5b5b;
+  }
+  * { box-sizing: border-box; }
   html, body {
     margin: 0;
     padding: 0;
-    background: #5c94fc;
     height: 100%;
     overflow: hidden;
     font-family: 'Trebuchet MS', Arial, sans-serif;
+    background: radial-gradient(circle at 50% 0%, #7fb8ff 0%, #4f7fe0 55%, #2c4fa8 100%);
   }
   #gameWrap {
     display: flex;
@@ -18,57 +28,136 @@
     align-items: center;
     justify-content: center;
     height: 100%;
+    gap: 10px;
   }
   #hud {
     width: 800px;
     max-width: 95vw;
     display: flex;
     justify-content: space-between;
+    align-items: center;
+  }
+  .badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel-bg);
+    border: 2px solid var(--panel-border);
+    backdrop-filter: blur(4px);
     color: #fff;
-    text-shadow: 2px 2px 0 #000;
-    font-size: 20px;
-    padding: 6px 10px;
-    box-sizing: border-box;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 1px 1px 0 #000;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  }
+  .badge .icon { font-size: 20px; }
+  .badge .value { color: var(--gold); }
+  #hearts .heart { color: var(--accent); }
+  #canvasWrap {
+    position: relative;
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.4), 0 0 0 4px rgba(255,255,255,0.08);
   }
   canvas {
     background: linear-gradient(#5c94fc, #a8d8ff);
     border: 6px solid #402a13;
-    border-radius: 6px;
+    border-radius: 10px;
     display: block;
     max-width: 95vw;
     image-rendering: pixelated;
   }
-  #msg {
+  .overlay {
     position: absolute;
-    top: 45%;
-    color: #fff;
-    background: rgba(0,0,0,0.6);
-    padding: 20px 30px;
-    border-radius: 10px;
-    font-size: 28px;
-    text-align: center;
+    inset: 0;
     display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 10, 25, 0.55);
+    border-radius: 10px;
+    backdrop-filter: blur(2px);
+  }
+  .overlay.visible { display: flex; }
+  .card {
+    background: linear-gradient(160deg, #1c2b4a, #101a30);
+    border: 3px solid rgba(255,255,255,0.15);
+    border-radius: 14px;
+    padding: 28px 36px;
+    text-align: center;
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    animation: pop 0.25s ease-out;
+    max-width: 90%;
+  }
+  @keyframes pop {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .card h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 22px;
+    margin: 0 0 14px;
+    color: var(--gold);
+    text-shadow: 2px 2px 0 #000;
+    letter-spacing: 1px;
+  }
+  .card p {
+    margin: 6px 0;
+    font-size: 16px;
+    line-height: 1.5;
+    opacity: 0.92;
+  }
+  .card .kbd {
+    display: inline-block;
+    background: #333;
+    border: 1px solid #666;
+    border-bottom-width: 3px;
+    border-radius: 5px;
+    padding: 2px 8px;
+    font-size: 13px;
+    font-family: monospace;
+    color: #fff;
+    margin: 0 2px;
+  }
+  .card .big {
+    font-size: 20px;
+    margin-top: 4px;
   }
   #controls {
     color: #fff;
     text-shadow: 1px 1px 0 #000;
-    margin-top: 8px;
-    font-size: 14px;
+    font-size: 13px;
     text-align: center;
+    opacity: 0.85;
   }
 </style>
 </head>
 <body>
 <div id="gameWrap">
   <div id="hud">
-    <div>⭐ Stars: <span id="starCount">0</span> / <span id="starTotal">0</span></div>
-    <div>❤️ Lives: <span id="lives">3</span></div>
+    <div class="badge"><span class="icon">⭐</span><span>Stars: <span class="value" id="starCount">0</span>/<span id="starTotal">0</span></span></div>
+    <div class="badge" id="hearts"><span class="icon heart">❤</span><span>Lives: <span class="value" id="lives">3</span></span></div>
   </div>
-  <div style="position:relative;">
+  <div id="canvasWrap">
     <canvas id="game" width="800" height="450"></canvas>
-    <div id="msg"></div>
+    <div id="titleOverlay" class="overlay visible">
+      <div class="card">
+        <h1>MINI MARIO</h1>
+        <p>Jump across platforms, dodge the pits,<br>and collect every star before the flag.</p>
+        <p><span class="kbd">&larr;</span><span class="kbd">&rarr;</span> or <span class="kbd">A</span><span class="kbd">D</span> to move &middot; <span class="kbd">Space</span> to jump</p>
+        <p class="big">Press any key to start</p>
+      </div>
+    </div>
+    <div id="msgOverlay" class="overlay">
+      <div class="card">
+        <h1 id="msgTitle">GAME OVER</h1>
+        <p id="msgBody"></p>
+        <p class="big">Press <span class="kbd">R</span> to restart</p>
+      </div>
+    </div>
   </div>
-  <div id="controls">← → or A/D to move · Space / ↑ / W to jump · R to restart</div>
+  <div id="controls">&larr; &rarr; or A/D to move &middot; Space / &uarr; / W to jump &middot; R to restart</div>
 </div>
 
 <script>
@@ -77,7 +166,10 @@ const ctx = canvas.getContext('2d');
 const starCountEl = document.getElementById('starCount');
 const starTotalEl = document.getElementById('starTotal');
 const livesEl = document.getElementById('lives');
-const msgEl = document.getElementById('msg');
+const titleOverlay = document.getElementById('titleOverlay');
+const msgOverlay = document.getElementById('msgOverlay');
+const msgTitle = document.getElementById('msgTitle');
+const msgBody = document.getElementById('msgBody');
 
 const GRAVITY = 0.6;
 const FRICTION = 0.8;
@@ -92,8 +184,20 @@ let keys = {};
 window.addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if (e.key === ' ') e.preventDefault();
+
+  if (gameState === 'title' && e.key.toLowerCase() !== 'r') {
+    gameState = 'playing';
+    titleOverlay.classList.remove('visible');
+  }
+  if (e.key.toLowerCase() === 'r') restart();
 });
 window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+canvas.addEventListener('click', () => {
+  if (gameState === 'title') {
+    gameState = 'playing';
+    titleOverlay.classList.remove('visible');
+  }
+});
 
 // ---- Level layout ----
 // Platforms: x, y, width, height
@@ -142,7 +246,8 @@ starTotalEl.textContent = stars.length;
 const goal = { x: 2350, y: 250, w: 20, h: 150 };
 
 let camX = 0;
-let gameState = 'playing'; // playing, won, dead
+let gameState = 'title'; // title, playing, won, dead
+let particles = [];
 
 function createPlayer() {
   return {
@@ -152,6 +257,7 @@ function createPlayer() {
     facing: 1,
     starsCollected: 0,
     lives: 3,
+    walkPhase: 0,
   };
 }
 let player = createPlayer();
@@ -164,20 +270,48 @@ function rectsOverlap(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+function spawnBurst(x, y, color) {
+  for (let i = 0; i < 10; i++) {
+    const angle = (Math.PI * 2 / 10) * i;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * (1.5 + Math.random() * 1.5),
+      vy: Math.sin(angle) * (1.5 + Math.random() * 1.5),
+      life: 1,
+      color,
+    });
+  }
+}
+
+function updateParticles() {
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.1;
+    p.life -= 0.03;
+  }
+  particles = particles.filter(p => p.life > 0);
+}
+
 function update() {
-  if (gameState !== 'playing') return;
+  if (gameState !== 'playing') { updateParticles(); return; }
 
   // Horizontal input
+  let moving = false;
   if (keys['arrowleft'] || keys['a']) {
     player.vx -= 1;
     player.facing = -1;
+    moving = true;
   }
   if (keys['arrowright'] || keys['d']) {
     player.vx += 1;
     player.facing = 1;
+    moving = true;
   }
   player.vx *= FRICTION;
   if (Math.abs(player.vx) > MOVE_SPEED) player.vx = MOVE_SPEED * Math.sign(player.vx);
+
+  if (moving && player.onGround) player.walkPhase += 0.35;
 
   // Jump
   if ((keys['arrowup'] || keys['w'] || keys[' ']) && player.onGround) {
@@ -241,6 +375,7 @@ function update() {
         s.taken = true;
         player.starsCollected++;
         starCountEl.textContent = player.starsCollected;
+        spawnBurst(s.x - camX, s.y, '255, 215, 0');
       }
     }
   }
@@ -254,6 +389,8 @@ function update() {
   camX = player.x - 300;
   if (camX < 0) camX = 0;
   if (camX > WORLD_WIDTH - canvas.width) camX = WORLD_WIDTH - canvas.width;
+
+  updateParticles();
 }
 
 function loseLife() {
@@ -261,7 +398,7 @@ function loseLife() {
   livesEl.textContent = player.lives;
   if (player.lives <= 0) {
     gameState = 'dead';
-    showMessage('Game Over! Press R to restart');
+    showMessage('GAME OVER', 'You ran out of lives. Stars collected: ' + player.starsCollected + '/' + stars.length);
   } else {
     resetPlayerPosition(player);
   }
@@ -269,15 +406,16 @@ function loseLife() {
 
 function winGame() {
   gameState = 'won';
-  showMessage('🎉 You reached the flag! Stars: ' + player.starsCollected + '/' + stars.length + '  (Press R to restart)');
+  showMessage('YOU WIN!', 'You reached the flag with ' + player.starsCollected + '/' + stars.length + ' stars.');
 }
 
-function showMessage(text) {
-  msgEl.textContent = text;
-  msgEl.style.display = 'block';
+function showMessage(title, body) {
+  msgTitle.textContent = title;
+  msgBody.textContent = body;
+  msgOverlay.classList.add('visible');
 }
 function hideMessage() {
-  msgEl.style.display = 'none';
+  msgOverlay.classList.remove('visible');
 }
 
 function restart() {
@@ -285,12 +423,32 @@ function restart() {
   stars.forEach(s => s.taken = false);
   starCountEl.textContent = 0;
   livesEl.textContent = player.lives;
+  particles = [];
   gameState = 'playing';
+  titleOverlay.classList.remove('visible');
   hideMessage();
 }
-window.addEventListener('keydown', e => {
-  if (e.key.toLowerCase() === 'r') restart();
-});
+
+function drawSky() {
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, '#6fb2ff');
+  grad.addColorStop(1, '#bfe4ff');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawMountains() {
+  ctx.fillStyle = 'rgba(90, 110, 160, 0.45)';
+  for (let i = 0; i < 5; i++) {
+    const mx = (i * 420 - camX * 0.15) % (WORLD_WIDTH + 420) - 100;
+    ctx.beginPath();
+    ctx.moveTo(mx, GROUND_Y + 10);
+    ctx.lineTo(mx + 110, GROUND_Y - 130);
+    ctx.lineTo(mx + 220, GROUND_Y + 10);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
 
 function drawBackgroundHills() {
   ctx.fillStyle = '#4fa84a';
@@ -298,6 +456,13 @@ function drawBackgroundHills() {
     const hx = (i * 500 - camX * 0.3) % (WORLD_WIDTH + 500);
     ctx.beginPath();
     ctx.arc(hx, GROUND_Y + 40, 80, Math.PI, 0);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#3d8f3a';
+  for (let i = 0; i < 6; i++) {
+    const hx = (i * 500 - camX * 0.3) % (WORLD_WIDTH + 500) + 60;
+    ctx.beginPath();
+    ctx.arc(hx, GROUND_Y + 55, 55, Math.PI, 0);
     ctx.fill();
   }
   // clouds
@@ -321,20 +486,35 @@ function drawPlatforms() {
   for (const p of platforms) {
     const drawX = p.x - camX;
     if (drawX + p.w < 0 || drawX > canvas.width) continue;
-    // dirt block style
+    // dirt block style with brick seams
     ctx.fillStyle = '#8b5a2b';
     ctx.fillRect(drawX, p.y, p.w, p.h);
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1;
+    for (let bx = 0; bx < p.w; bx += 24) {
+      ctx.beginPath();
+      ctx.moveTo(drawX + bx, p.y + 10);
+      ctx.lineTo(drawX + bx, p.y + p.h);
+      ctx.stroke();
+    }
     ctx.fillStyle = '#5aa64c';
     ctx.fillRect(drawX, p.y, p.w, 10);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(drawX, p.y, p.w, 3);
   }
 }
 
-function drawStar(x, y, taken) {
+function drawStar(x, y, taken, t) {
   if (taken) return;
   const drawX = x - camX;
   if (drawX < -30 || drawX > canvas.width + 30) return;
+  const bob = Math.sin(t / 300 + x) * 4;
+  const scale = 1 + Math.sin(t / 200 + x) * 0.12;
   ctx.save();
-  ctx.translate(drawX, y);
+  ctx.translate(drawX, y + bob);
+  ctx.scale(scale, scale);
+  ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
+  ctx.shadowBlur = 12;
   ctx.fillStyle = '#ffd700';
   ctx.strokeStyle = '#c98e00';
   ctx.lineWidth = 2;
@@ -356,15 +536,29 @@ function drawStar(x, y, taken) {
   ctx.restore();
 }
 
+function drawParticles() {
+  for (const p of particles) {
+    ctx.fillStyle = `rgba(${p.color}, ${Math.max(p.life, 0)})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function drawGoalFlag() {
   const drawX = goal.x - camX;
   ctx.fillStyle = '#cccccc';
   ctx.fillRect(drawX, goal.y - goal.h + 20, 4, goal.h);
+  ctx.beginPath();
+  ctx.arc(drawX + 2, goal.y - goal.h + 18, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffe066';
+  ctx.fill();
   ctx.fillStyle = '#ff3b3b';
+  const wave = Math.sin(Date.now() / 250) * 4;
   ctx.beginPath();
   ctx.moveTo(drawX + 4, goal.y - goal.h + 25);
-  ctx.lineTo(drawX + 34, goal.y - goal.h + 38);
-  ctx.lineTo(drawX + 4, goal.y - goal.h + 51);
+  ctx.quadraticCurveTo(drawX + 20 + wave, goal.y - goal.h + 31, drawX + 34, goal.y - goal.h + 38);
+  ctx.quadraticCurveTo(drawX + 20 + wave, goal.y - goal.h + 45, drawX + 4, goal.y - goal.h + 51);
   ctx.closePath();
   ctx.fill();
 }
@@ -372,9 +566,17 @@ function drawGoalFlag() {
 function drawPlayer() {
   const drawX = player.x - camX;
   const drawY = player.y;
+  const squash = Math.max(-0.25, Math.min(0.25, player.vy / 30));
   ctx.save();
   ctx.translate(drawX + player.w / 2, drawY + player.h / 2);
-  ctx.scale(player.facing, 1);
+  ctx.scale(player.facing * (1 - squash * 0.3), 1 + squash * 0.3);
+
+  const legSwing = player.onGround ? Math.sin(player.walkPhase) * 6 : 0;
+
+  // legs
+  ctx.fillStyle = '#123c78';
+  ctx.fillRect(-player.w/2 + 2, player.h/2 - 10, 8, 10 + legSwing * 0.3);
+  ctx.fillRect(player.w/2 - 10, player.h/2 - 10, 8, 10 - legSwing * 0.3);
 
   // body (overalls)
   ctx.fillStyle = '#1a5fb4';
@@ -388,20 +590,36 @@ function drawPlayer() {
   // hat
   ctx.fillStyle = '#c8102e';
   ctx.fillRect(-player.w/2 + 2, -player.h/2 - 10, player.w - 4, 6);
-  // mustache/eye hint
+  // eye
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(4, -player.h/2 - 3, 3, 3);
+  // mustache
   ctx.fillStyle = '#3b2313';
   ctx.fillRect(2, -player.h/2 - 1, 6, 3);
 
   ctx.restore();
 }
 
+function drawHUDVignette() {
+  const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, canvas.height/2.2, canvas.width/2, canvas.height/2, canvas.height);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.25)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
 function draw() {
+  const t = Date.now();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawSky();
+  drawMountains();
   drawBackgroundHills();
   drawPlatforms();
-  stars.forEach(s => drawStar(s.x, s.y, s.taken));
+  stars.forEach(s => drawStar(s.x, s.y, s.taken, t));
   drawGoalFlag();
   drawPlayer();
+  drawParticles();
+  drawHUDVignette();
 }
 
 function loop() {
