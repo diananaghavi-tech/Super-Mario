@@ -6,7 +6,9 @@ on:
       - main
       - claude/practical-lamport-tm606n
     paths:
-      - "mariominigame.html"
+      - "index.html"
+      - "styles.css"
+      - "src/**"
   workflow_dispatch: {}
 
 jobs:
@@ -16,26 +18,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copy game file to server
+      - name: Copy game files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
           port: 22
-          source: "mariominigame.html"
+          source: |
+            index.html
+            styles.css
+            src/**/*
           target: "/srv/www/p17"
           strip_components: 0
-
-      - name: Publish as index.html
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          password: ${{ secrets.DEPLOY_PASSWORD }}
-          port: 22
-          script: |
-            cp /srv/www/p17/mariominigame.html /srv/www/p17/index.html
 
       - name: List deployed directory
         uses: appleboy/ssh-action@v1.2.0
