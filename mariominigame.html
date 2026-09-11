@@ -368,6 +368,9 @@ const optTouch = document.getElementById('optTouch');
 const optVolume = document.getElementById('optVolume');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 const restartBtn = document.getElementById('restartBtn');
+const hudEl = document.getElementById('hud');
+const progressBarWrapEl = document.getElementById('progressBarWrap');
+const controlsEl = document.getElementById('controls');
 const touchControls = document.getElementById('touchControls');
 const btnLeft = document.getElementById('btnLeft');
 const btnRight = document.getElementById('btnRight');
@@ -558,6 +561,12 @@ function startGame() {
   if (gameState !== 'title' || !settingsPanel.hidden) return;
   gameState = 'playing';
   titleOverlay.classList.remove('visible');
+  // Clears any stray held-key state from before the run started (e.g. a
+  // movement key still held from interacting with the title screen or
+  // settings), same idea as jumpKeyWasDown below but for every key -
+  // otherwise the player could take off moving the instant a run begins
+  // with no further keypress.
+  keys = {};
   jumpKeyWasDown = true; // don't let the key that starts the game also count as a jump
   ensureAudio();
   resetTimer();
@@ -630,8 +639,20 @@ titleOverlay.addEventListener('click', () => {
 // never drift apart from each other.
 function closeSettings() {
   settingsPanel.hidden = true;
+  setBackgroundInert(false);
   settingsBtn.setAttribute('aria-expanded', 'false');
   if (paused) { paused = false; startTimer(); }
+}
+// Marks everything outside the settings dialog `inert` while it's open, so
+// it's a real accessibility-tree modal (screen-reader browse-mode users
+// can't wander into background content) rather than just visually/
+// keyboard-Tab blocked. Removed again before focus returns to settingsBtn
+// on close.
+function setBackgroundInert(on) {
+  [hudEl, progressBarWrapEl, canvas, touchControls, toastEl, titleOverlay, msgOverlay, controlsEl].forEach(el => {
+    if (!el) return;
+    if (on) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+  });
 }
 muteBtn.addEventListener('click', () => {
   ensureAudio();
@@ -642,6 +663,7 @@ muteBtn.addEventListener('click', () => {
 settingsBtn.addEventListener('click', () => {
   if (settingsPanel.hidden) {
     settingsPanel.hidden = false;
+    setBackgroundInert(true);
     settingsBtn.setAttribute('aria-expanded', 'true');
     optReducedMotion.focus();
     if (gameState === 'playing' && !paused) { paused = true; stopTimer(); }
@@ -1138,6 +1160,7 @@ function hideMessage() {
 
 function restart() {
   closeSettings(); // in case a restart is triggered while settings happens to be open
+  keys = {}; // same rationale as in startGame() - don't carry stray held keys into the new run
   checkpoints.forEach(cp => cp.reached = false);
   spawnPoint = { x: 40, y: 300 };
   player = createPlayer();
