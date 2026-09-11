@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Little Prince - Jump & Collect Stars</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,12 +24,13 @@
     background: radial-gradient(circle at 50% 0%, #7fb8ff 0%, #4f7fe0 55%, #2c4fa8 100%);
   }
   #gameWrap {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
-    gap: 10px;
+    gap: 8px;
   }
   #hud {
     width: 800px;
@@ -36,6 +38,15 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  #hudRight {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
   .badge {
     display: flex;
@@ -51,10 +62,45 @@
     font-weight: bold;
     text-shadow: 1px 1px 0 #000;
     box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    white-space: nowrap;
   }
   .badge .icon { font-size: 20px; }
   .badge .value { color: var(--gold); }
   #hearts .heart { color: var(--accent); }
+  .iconBtn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--panel-bg);
+    border: 2px solid var(--panel-border);
+    color: #fff;
+    font-size: 17px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  }
+  .iconBtn:hover { filter: brightness(1.15); }
+  .iconBtn:focus-visible, .touchBtn:focus-visible, input:focus-visible, button:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+  #progressBarWrap {
+    width: 800px;
+    max-width: 95vw;
+    height: 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.25);
+    overflow: hidden;
+  }
+  #progressBarFill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #ffd700, #ffb700);
+    transition: width 0.15s linear;
+  }
   #canvasWrap {
     position: relative;
     border-radius: 12px;
@@ -94,6 +140,9 @@
     from { transform: scale(0.85); opacity: 0; }
     to { transform: scale(1); opacity: 1; }
   }
+  @media (prefers-reduced-motion: reduce) {
+    .card { animation: none; }
+  }
   .card h1 {
     font-family: 'Press Start 2P', monospace;
     font-size: 22px;
@@ -124,12 +173,103 @@
     font-size: 20px;
     margin-top: 4px;
   }
+  .card .best {
+    font-size: 14px;
+    color: var(--gold);
+    opacity: 0.95;
+  }
   #controls {
     color: #fff;
     text-shadow: 1px 1px 0 #000;
     font-size: 13px;
     text-align: center;
     opacity: 0.85;
+    max-width: 95vw;
+  }
+  #settingsPanel {
+    position: absolute;
+    top: 50px;
+    right: 6px;
+    z-index: 6;
+    background: linear-gradient(160deg, #1c2b4a, #101a30);
+    border: 2px solid rgba(255,255,255,0.18);
+    border-radius: 10px;
+    padding: 14px 16px;
+    color: #fff;
+    font-size: 14px;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.4);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 200px;
+  }
+  #settingsPanel[hidden] { display: none; }
+  #settingsPanel label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  #settingsPanel button {
+    align-self: flex-end;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #touchControls {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 14px;
+    pointer-events: none;
+  }
+  #touchControls[hidden] { display: none; }
+  #touchControls .side { display: flex; gap: 12px; pointer-events: auto; }
+  .touchBtn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.22);
+    border: 2px solid rgba(255,255,255,0.5);
+    color: #fff;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+  }
+  .touchBtn:active { background: rgba(255,255,255,0.4); }
+  #btnRun { font-size: 12px; font-weight: bold; }
+  #toast {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translate(-50%, -8px);
+    background: rgba(10,20,40,0.88);
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 4;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
   }
 </style>
 </head>
@@ -137,17 +277,41 @@
 <div id="gameWrap">
   <div id="hud">
     <div class="badge"><span class="icon">⭐</span><span>Stars: <span class="value" id="starCount">0</span>/<span id="starTotal">0</span></span></div>
-    <div class="badge" id="hearts"><span class="icon heart">❤</span><span>Lives: <span class="value" id="lives">3</span></span></div>
+    <div id="hudRight">
+      <div class="badge"><span class="icon">⏱</span><span id="timerDisplay">0:00</span></div>
+      <div class="badge" id="hearts"><span class="icon heart">❤</span><span>Lives: <span class="value" id="lives">3</span></span></div>
+      <button class="iconBtn" id="muteBtn" type="button" aria-label="Mute sound" aria-pressed="false">🔊</button>
+      <button class="iconBtn" id="settingsBtn" type="button" aria-label="Open settings" aria-expanded="false">⚙️</button>
+    </div>
   </div>
+  <div id="progressBarWrap" aria-hidden="true"><div id="progressBarFill"></div></div>
   <div id="canvasWrap">
-    <canvas id="game" width="800" height="450"></canvas>
+    <canvas id="game" width="800" height="450" role="img" aria-label="The Little Prince platformer game viewport"></canvas>
+    <div id="settingsPanel" role="dialog" aria-label="Settings" hidden>
+      <label><input type="checkbox" id="optReducedMotion"> Reduce motion</label>
+      <label><input type="checkbox" id="optTouch"> Show touch controls</label>
+      <button id="closeSettingsBtn" type="button">Close</button>
+    </div>
+    <div id="touchControls" hidden>
+      <div class="side">
+        <button class="touchBtn" id="btnLeft" type="button" aria-label="Move left">◀</button>
+        <button class="touchBtn" id="btnRight" type="button" aria-label="Move right">▶</button>
+      </div>
+      <div class="side">
+        <button class="touchBtn" id="btnRun" type="button" aria-label="Hold to run">RUN</button>
+        <button class="touchBtn" id="btnJump" type="button" aria-label="Jump (tap again in mid-air to double jump)">⤒</button>
+      </div>
+    </div>
+    <div id="toast" role="status"></div>
     <div id="titleOverlay" class="overlay visible">
       <div class="card">
         <h1>THE LITTLE PRINCE</h1>
         <p>Jump across platforms, stomp goombas, dodge the pits,<br>grab mushrooms, and collect every star before the flag.</p>
         <p><span class="kbd">&larr;</span><span class="kbd">&rarr;</span> or <span class="kbd">A</span><span class="kbd">D</span> to move &middot; <span class="kbd">Shift</span> to run</p>
         <p><span class="kbd">Space</span> to jump &middot; tap it again in mid-air to double jump</p>
+        <p>Touch controls appear automatically on touch devices &middot; use <span class="kbd">⚙</span> for sound/motion options</p>
         <p class="big">Press any key to start</p>
+        <p class="best" id="bestLine" style="display:none;"></p>
       </div>
     </div>
     <div id="msgOverlay" class="overlay">
@@ -158,7 +322,8 @@
       </div>
     </div>
   </div>
-  <div id="controls">&larr; &rarr; or A/D to move &middot; Shift to run &middot; Space / &uarr; / W to jump (tap again to double jump) &middot; R to restart</div>
+  <div id="controls">&larr; &rarr; or A/D to move &middot; Shift to run &middot; Space / &uarr; / W to jump (tap again to double jump) &middot; R to restart &middot; ⚙ for settings</div>
+  <div id="srAnnounce" class="visually-hidden" aria-live="polite"></div>
 </div>
 
 <script>
@@ -171,40 +336,286 @@ const titleOverlay = document.getElementById('titleOverlay');
 const msgOverlay = document.getElementById('msgOverlay');
 const msgTitle = document.getElementById('msgTitle');
 const msgBody = document.getElementById('msgBody');
+const bestLine = document.getElementById('bestLine');
+const timerDisplay = document.getElementById('timerDisplay');
+const progressFill = document.getElementById('progressBarFill');
+const toastEl = document.getElementById('toast');
+const srAnnounce = document.getElementById('srAnnounce');
+const muteBtn = document.getElementById('muteBtn');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+const optReducedMotion = document.getElementById('optReducedMotion');
+const optTouch = document.getElementById('optTouch');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+const touchControls = document.getElementById('touchControls');
+const btnLeft = document.getElementById('btnLeft');
+const btnRight = document.getElementById('btnRight');
+const btnRun = document.getElementById('btnRun');
+const btnJump = document.getElementById('btnJump');
 
+// ===== Settings & persistence (localStorage; every access is guarded since =====
+// ===== private-browsing / file:// contexts can throw or silently no-op)    =====
+const SETTINGS_KEY = 'littlePrinceGame.settings.v1';
+const BEST_KEY = 'littlePrinceGame.best.v1';
+
+function isTouchDevice() {
+  return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+}
+function loadSettings() {
+  const s = {
+    muted: false,
+    reducedMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
+    showTouch: isTouchDevice(),
+  };
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) Object.assign(s, JSON.parse(raw));
+  } catch (e) { /* ignore: storage unavailable */ }
+  return s;
+}
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* ignore */ }
+}
+function loadBest() {
+  try {
+    const raw = localStorage.getItem(BEST_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* ignore */ }
+  return null;
+}
+function saveBestIfBetter(starsN, timeMs) {
+  const cur = loadBest();
+  const better = !cur || starsN > cur.stars || (starsN === cur.stars && timeMs < cur.timeMs);
+  if (better) {
+    try { localStorage.setItem(BEST_KEY, JSON.stringify({ stars: starsN, timeMs })); } catch (e) { /* ignore */ }
+  }
+  return better;
+}
+let settings = loadSettings();
+
+function applySettingsToUI() {
+  muteBtn.textContent = settings.muted ? '🔇' : '🔊';
+  muteBtn.setAttribute('aria-pressed', String(settings.muted));
+  optReducedMotion.checked = settings.reducedMotion;
+  optTouch.checked = settings.showTouch;
+  touchControls.hidden = !settings.showTouch;
+}
+
+// ===== Audio: procedural WebAudio synth SFX + a light music loop.       =====
+// ===== No external asset files, so it can't break the single-file deploy. =====
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+  } else if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+function tone(freq, duration, type, startGain, glideTo) {
+  if (!audioCtx || settings.muted) return;
+  const t0 = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'square';
+  osc.frequency.setValueAtTime(freq, t0);
+  if (glideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(glideTo, 1), t0 + duration);
+  gain.gain.setValueAtTime(startGain != null ? startGain : 0.15, t0);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.02);
+}
+const SFX = {
+  jump: () => tone(520, 0.12, 'square', 0.12, 780),
+  doubleJump: () => tone(660, 0.14, 'square', 0.12, 990),
+  star: () => { tone(880, 0.08, 'triangle', 0.15, 1320); setTimeout(() => tone(1320, 0.12, 'triangle', 0.12), 60); },
+  mushroom: () => { [520, 660, 780, 1040].forEach((f, i) => setTimeout(() => tone(f, 0.1, 'square', 0.12), i * 70)); },
+  stomp: () => tone(160, 0.12, 'square', 0.18, 60),
+  hurt: () => tone(180, 0.25, 'sawtooth', 0.18, 60),
+  checkpoint: () => { [660, 880].forEach((f, i) => setTimeout(() => tone(f, 0.15, 'triangle', 0.14), i * 90)); },
+  lifeLost: () => { [440, 330, 220].forEach((f, i) => setTimeout(() => tone(f, 0.18, 'sawtooth', 0.16), i * 140)); },
+  gameOver: () => { [330, 290, 240, 180].forEach((f, i) => setTimeout(() => tone(f, 0.3, 'sawtooth', 0.16), i * 180)); },
+  win: () => { [660, 880, 990, 1320].forEach((f, i) => setTimeout(() => tone(f, 0.22, 'triangle', 0.16), i * 140)); },
+};
+const MUSIC_NOTES = [392, 440, 494, 440, 523, 494, 440, 392];
+let musicTimer = null;
+let musicStep = 0;
+function scheduleMusicStep() {
+  if (!audioCtx || settings.muted || gameState !== 'playing') return;
+  tone(MUSIC_NOTES[musicStep % MUSIC_NOTES.length], 0.25, 'sine', 0.045, null);
+  musicStep++;
+}
+function startMusic() {
+  if (musicTimer) return;
+  musicStep = 0;
+  musicTimer = setInterval(scheduleMusicStep, 300);
+}
+function stopMusic() {
+  if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+}
+
+// ===== Accessibility helpers =====
+function announce(msg) { srAnnounce.textContent = msg; }
+let toastTimer = null;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 1600);
+}
+function hideToast() { toastEl.classList.remove('show'); }
+
+// ===== Timer & best-run tracking =====
+let playStartTime = 0;
+let elapsedMs = 0;
+let timerRunning = false;
+function startTimer() { playStartTime = performance.now() - elapsedMs; timerRunning = true; }
+function stopTimer() { timerRunning = false; }
+function resetTimer() { elapsedMs = 0; timerRunning = false; }
+function formatTime(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const mm = Math.floor(totalSec / 60);
+  const ss = String(totalSec % 60).padStart(2, '0');
+  return mm + ':' + ss;
+}
+function updateTimerDisplay() {
+  if (timerRunning) elapsedMs = performance.now() - playStartTime;
+  timerDisplay.textContent = formatTime(elapsedMs);
+}
+function refreshBestLine() {
+  const best = loadBest();
+  if (best) {
+    bestLine.style.display = '';
+    bestLine.textContent = 'Best: ' + best.stars + '/' + stars.length + ' stars · ' + formatTime(best.timeMs);
+  } else {
+    bestLine.style.display = 'none';
+  }
+}
+
+// ===== Tunable physics/gameplay constants =====
 const GRAVITY = 0.6;
 const FRICTION = 0.8;
 const WALK_SPEED = 4;
 const RUN_SPEED = 7.5;
 const JUMP_FORCE = -12.5;
 const DOUBLE_JUMP_FORCE = -10.5;
+const STOMP_OVERLAP_PX = 14;   // how much the player's feet must be above an enemy's top to count as a stomp, not a side hit
+const STOMP_BOUNCE = 0.55;     // upward bounce (relative to JUMP_FORCE) after a successful stomp
+const INVULN_FRAMES = 90;      // brief invulnerability window after taking damage
+const KNOCKBACK_VX = 6;
+const KNOCKBACK_VY = -6;
+const DEATH_Y = 500;           // falling past this y counts as "off the world"
+const RESTART_CONFIRM_MS = 2000;
 
 // World is wider than the canvas; camera scrolls horizontally.
 const WORLD_WIDTH = 2400;
 const GROUND_Y = 400;
 
 let keys = {};
+let restartArmed = false;
+let restartArmTimeout = null;
+
+function startGame() {
+  if (gameState !== 'title') return;
+  gameState = 'playing';
+  titleOverlay.classList.remove('visible');
+  jumpKeyWasDown = true; // don't let the key that starts the game also count as a jump
+  ensureAudio();
+  resetTimer();
+  startTimer();
+  startMusic();
+  announce('Game started.');
+}
+
 window.addEventListener('keydown', e => {
-  keys[e.key.toLowerCase()] = true;
+  const key = e.key.toLowerCase();
+  keys[key] = true;
   if (e.key === ' ') e.preventDefault();
 
-  if (gameState === 'title' && e.key.toLowerCase() !== 'r') {
-    gameState = 'playing';
-    titleOverlay.classList.remove('visible');
-    jumpKeyWasDown = true; // don't let the key that starts the game also count as a jump
+  if (key === 'escape' && !settingsPanel.hidden) {
+    settingsPanel.hidden = true;
+    settingsBtn.setAttribute('aria-expanded', 'false');
   }
-  if (e.key.toLowerCase() === 'r') restart();
+
+  if (gameState === 'title' && key !== 'r') {
+    startGame();
+  }
+
+  if (key === 'r') {
+    if (gameState === 'playing') {
+      // Restarting mid-run wipes lives/stars/time, so require a second press
+      // within a short window instead of restarting on a single stray keypress.
+      if (restartArmed) {
+        clearTimeout(restartArmTimeout);
+        restartArmed = false;
+        hideToast();
+        restart();
+      } else {
+        restartArmed = true;
+        showToast('Press R again to restart');
+        restartArmTimeout = setTimeout(() => { restartArmed = false; hideToast(); }, RESTART_CONFIRM_MS);
+      }
+    } else {
+      restart();
+    }
+  } else if (restartArmed) {
+    restartArmed = false;
+    clearTimeout(restartArmTimeout);
+    hideToast();
+  }
 });
 window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 canvas.addEventListener('click', () => {
-  if (gameState === 'title') {
-    gameState = 'playing';
-    titleOverlay.classList.remove('visible');
-  }
+  if (gameState === 'title') startGame();
 });
 
+// ===== Settings UI wiring =====
+muteBtn.addEventListener('click', () => {
+  ensureAudio();
+  settings.muted = !settings.muted;
+  saveSettings();
+  applySettingsToUI();
+});
+settingsBtn.addEventListener('click', () => {
+  const willOpen = settingsPanel.hidden;
+  settingsPanel.hidden = !willOpen;
+  settingsBtn.setAttribute('aria-expanded', String(willOpen));
+});
+closeSettingsBtn.addEventListener('click', () => {
+  settingsPanel.hidden = true;
+  settingsBtn.setAttribute('aria-expanded', 'false');
+});
+optReducedMotion.addEventListener('change', () => {
+  settings.reducedMotion = optReducedMotion.checked;
+  saveSettings();
+});
+optTouch.addEventListener('change', () => {
+  settings.showTouch = optTouch.checked;
+  saveSettings();
+  applySettingsToUI();
+});
+
+// ===== Touch controls: reuse the same `keys` map the keyboard uses =====
+function bindHold(el, keyName) {
+  const set = down => e => { e.preventDefault(); keys[keyName] = down; };
+  el.addEventListener('pointerdown', set(true));
+  el.addEventListener('pointerup', set(false));
+  el.addEventListener('pointercancel', set(false));
+  el.addEventListener('pointerleave', set(false));
+}
+bindHold(btnLeft, 'arrowleft');
+bindHold(btnRight, 'arrowright');
+bindHold(btnRun, 'shift');
+btnJump.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (gameState === 'title') startGame();
+  keys[' '] = true;
+});
+btnJump.addEventListener('pointerup', e => { e.preventDefault(); keys[' '] = false; });
+btnJump.addEventListener('pointercancel', () => { keys[' '] = false; });
+
 // ---- Level layout ----
-// Platforms: x, y, width, height
+// Platforms: x, y, width, height. Ones with `moving:true` oscillate at runtime.
 const platforms = [
   { x: 0,    y: GROUND_Y, w: 500,  h: 50 },
   { x: 560,  y: GROUND_Y, w: 260,  h: 50 },
@@ -221,6 +632,8 @@ const platforms = [
   { x: 1600, y: 240, w: 100, h: 20 },
   { x: 1900, y: 300, w: 120, h: 20 },
   { x: 2100, y: 250, w: 100, h: 20 },
+  // moving platform: an alternate, timing-based way across the pit at 1300-1380
+  { x: 1310, y: 280, w: 70, h: 16, moving: true, axis: 'y', min: 230, max: 330, speed: 0.9, dir: 1 },
 ];
 
 // Gaps (pits) - defined as x ranges where there's no ground so falling = death
@@ -254,16 +667,26 @@ let mushrooms = [
   { x: 2000, y: GROUND_Y - 20, taken: false },
 ];
 
-// Goombas that patrol a fixed range and must be jumped on or avoided
+// Checkpoints: touching one moves the respawn point up, so a death late in the
+// level doesn't send the player all the way back to the start.
+let checkpoints = [
+  { x: 610, y: GROUND_Y - 90, w: 14, h: 90, reached: false },
+  { x: 1800, y: GROUND_Y - 90, w: 14, h: 90, reached: false },
+];
+let spawnPoint = { x: 40, y: 300 };
+
+// Goombas patrol a fixed range and must be jumped on or avoided. One "flyer"
+// bobs vertically for a bit of enemy variety.
 const PLAYER_SMALL = { w: 28, h: 36 };
 const PLAYER_BIG = { w: 30, h: 48 };
 const ENEMY_SPEED = 1.3;
 function makeEnemies() {
   return [
-    { x: 300, y: GROUND_Y - 24, w: 24, h: 24, minX: 260, maxX: 460, vx: ENEMY_SPEED, alive: true },
-    { x: 950, y: GROUND_Y - 24, w: 24, h: 24, minX: 910, maxX: 1260, vx: ENEMY_SPEED, alive: true },
-    { x: 1420, y: GROUND_Y - 24, w: 24, h: 24, minX: 1390, maxX: 1650, vx: -ENEMY_SPEED, alive: true },
-    { x: 1900, y: GROUND_Y - 24, w: 24, h: 24, minX: 1780, maxX: 2350, vx: ENEMY_SPEED, alive: true },
+    { x: 300,  y: GROUND_Y - 24, w: 24, h: 24, minX: 260,  maxX: 460,  vx: ENEMY_SPEED,  alive: true, type: 'goomba' },
+    { x: 950,  y: GROUND_Y - 24, w: 24, h: 24, minX: 910,  maxX: 1260, vx: ENEMY_SPEED,  alive: true, type: 'goomba' },
+    { x: 1420, y: GROUND_Y - 24, w: 24, h: 24, minX: 1390, maxX: 1650, vx: -ENEMY_SPEED, alive: true, type: 'goomba' },
+    { x: 1900, y: GROUND_Y - 24, w: 24, h: 24, minX: 1780, maxX: 2350, vx: ENEMY_SPEED,  alive: true, type: 'goomba' },
+    { x: 1050, y: 150, baseY: 150, w: 22, h: 18, minX: 1000, maxX: 1230, vx: ENEMY_SPEED * 0.9, alive: true, type: 'flyer' },
   ];
 }
 let enemies = makeEnemies();
@@ -275,10 +698,11 @@ let camX = 0;
 let gameState = 'title'; // title, playing, won, dead
 let particles = [];
 let jumpKeyWasDown = false;
+let lifeLostThisFrame = false;
 
 function createPlayer() {
   return {
-    x: 40, y: 300, w: PLAYER_SMALL.w, h: PLAYER_SMALL.h,
+    x: spawnPoint.x, y: spawnPoint.y, w: PLAYER_SMALL.w, h: PLAYER_SMALL.h,
     vx: 0, vy: 0,
     onGround: false,
     facing: 1,
@@ -293,7 +717,7 @@ function createPlayer() {
 let player = createPlayer();
 
 function resetPlayerPosition(p) {
-  p.x = 40; p.y = 300; p.vx = 0; p.vy = 0;
+  p.x = spawnPoint.x; p.y = spawnPoint.y; p.vx = 0; p.vy = 0;
 }
 
 function growPlayer(p) {
@@ -316,6 +740,14 @@ function shrinkPlayer(p) {
 
 function rectsOverlap(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function ratingForStars(collected, total) {
+  const pct = collected / total;
+  if (pct >= 1) return { label: 'PERFECT RUN!', emoji: '🌟' };
+  if (pct >= 0.7) return { label: 'GREAT JOB!', emoji: '🥇' };
+  if (pct >= 0.4) return { label: 'NICE WORK!', emoji: '🥈' };
+  return { label: 'YOU MADE IT', emoji: '🥉' };
 }
 
 function spawnBurst(x, y, color) {
@@ -341,8 +773,23 @@ function updateParticles() {
   particles = particles.filter(p => p.life > 0);
 }
 
+function updateMovingPlatforms() {
+  for (const p of platforms) {
+    if (!p.moving) continue;
+    if (p.axis === 'y') {
+      p.y += p.dir * p.speed;
+      if (p.y <= p.min) { p.y = p.min; p.dir = 1; }
+      if (p.y >= p.max) { p.y = p.max; p.dir = -1; }
+    }
+  }
+}
+
 function update() {
   if (gameState !== 'playing') { updateParticles(); return; }
+  lifeLostThisFrame = false;
+  const t = Date.now();
+
+  updateMovingPlatforms();
 
   const running = keys['shift'];
   const maxSpeed = running ? RUN_SPEED : WALK_SPEED;
@@ -364,16 +811,26 @@ function update() {
 
   if (moving && player.onGround) player.walkPhase += running ? 0.55 : 0.35;
 
-  // Jump / double jump (edge-triggered so holding the key doesn't chain-jump)
+  // Jump / double jump (edge-triggered so holding the key doesn't chain-jump).
+  // `jumpsUsed` counts jumps taken since the player last stood on ground: the
+  // FIRST air jump always uses full JUMP_FORCE (this also covers walking off a
+  // ledge without ever pressing jump - that's still charge #1, not charge #2),
+  // and only the second one is the weaker double jump.
   const jumpPressed = keys['arrowup'] || keys['w'] || keys[' '];
   if (jumpPressed && !jumpKeyWasDown) {
     if (player.onGround) {
       player.vy = JUMP_FORCE;
       player.onGround = false;
       player.jumpsUsed = 1;
+      SFX.jump();
+    } else if (player.jumpsUsed === 0) {
+      player.vy = JUMP_FORCE;
+      player.jumpsUsed = 1;
+      SFX.jump();
     } else if (player.jumpsUsed < 2) {
       player.vy = DOUBLE_JUMP_FORCE;
       player.jumpsUsed = 2;
+      SFX.doubleJump();
       spawnBurst(player.x - camX + player.w / 2, player.y + player.h / 2, '255, 255, 255');
     }
   }
@@ -383,35 +840,34 @@ function update() {
   player.vy += GRAVITY;
   if (player.vy > 15) player.vy = 15;
 
-  // Move horizontally then resolve collisions
+  // Move horizontally then resolve collisions based on which side the player
+  // approached from (rather than an arbitrary overlap-depth threshold, which
+  // left larger overlaps unresolved and risked tunneling).
+  const prevX = player.x;
+  const prevY = player.y;
   player.x += player.vx;
-  player.onGround = false;
-
   for (const p of platforms) {
     if (rectsOverlap(player, p)) {
-      // Resolve based on overlap direction (simple approach)
-      const overlapLeft = (player.x + player.w) - p.x;
-      const overlapRight = (p.x + p.w) - player.x;
-      if (player.vx > 0 && overlapLeft < 20) {
-        player.x = p.x - player.w;
-      } else if (player.vx < 0 && overlapRight < 20) {
-        player.x = p.x + p.w;
-      }
+      const wasLeftOf = prevX + player.w <= p.x;
+      const wasRightOf = prevX >= p.x + p.w;
+      if (wasLeftOf) { player.x = p.x - player.w; player.vx = 0; }
+      else if (wasRightOf) { player.x = p.x + p.w; player.vx = 0; }
     }
   }
 
-  // Move vertically then resolve collisions
+  // Move vertically then resolve collisions the same way.
+  player.onGround = false;
   player.y += player.vy;
   for (const p of platforms) {
     if (rectsOverlap(player, p)) {
-      if (player.vy > 0) {
-        // landing on top
+      const wasAbove = prevY + player.h <= p.y;
+      const wasBelow = prevY >= p.y + p.h;
+      if (player.vy > 0 && wasAbove) {
         player.y = p.y - player.h;
         player.vy = 0;
         player.onGround = true;
         player.jumpsUsed = 0;
-      } else if (player.vy < 0) {
-        // hit head
+      } else if (player.vy < 0 && wasBelow) {
         player.y = p.y + p.h;
         player.vy = 0;
       }
@@ -420,7 +876,7 @@ function update() {
 
   // Fell into a pit or off the world -> lose a life
   const inPit = pits.some(pit => player.x + player.w/2 > pit.x1 && player.x + player.w/2 < pit.x2);
-  if (player.y > 500 || (inPit && player.y > GROUND_Y)) {
+  if (!lifeLostThisFrame && (player.y > DEATH_Y || (inPit && player.y > GROUND_Y))) {
     loseLife();
   }
 
@@ -437,6 +893,8 @@ function update() {
         player.starsCollected++;
         starCountEl.textContent = player.starsCollected;
         spawnBurst(s.x - camX, s.y, '255, 215, 0');
+        SFX.star();
+        announce('Star collected: ' + player.starsCollected + ' of ' + stars.length + '.');
       }
     }
   }
@@ -449,7 +907,20 @@ function update() {
         m.taken = true;
         growPlayer(player);
         spawnBurst(m.x - camX, m.y, '220, 60, 60');
+        SFX.mushroom();
+        announce('Power mushroom collected! You grew bigger.');
       }
+    }
+  }
+
+  // Checkpoints - move the respawn point forward once touched
+  for (const cp of checkpoints) {
+    if (!cp.reached && rectsOverlap(player, cp)) {
+      cp.reached = true;
+      spawnPoint = { x: cp.x, y: 300 };
+      SFX.checkpoint();
+      showToast('Checkpoint reached!');
+      announce('Checkpoint reached.');
     }
   }
 
@@ -461,32 +932,37 @@ function update() {
     en.x += en.vx;
     if (en.x < en.minX) { en.x = en.minX; en.vx = Math.abs(en.vx); }
     if (en.x + en.w > en.maxX) { en.x = en.maxX - en.w; en.vx = -Math.abs(en.vx); }
+    if (en.type === 'flyer') {
+      en.y = en.baseY + (settings.reducedMotion ? 0 : Math.sin(t / 250 + en.x * 0.05) * 18);
+    }
 
     if (rectsOverlap(player, en)) {
-      const stomping = player.vy > 0 && (player.y + player.h - en.y) < 14;
+      const stomping = player.vy > 0 && (player.y + player.h - en.y) < STOMP_OVERLAP_PX;
       if (stomping) {
         en.alive = false;
-        player.vy = JUMP_FORCE * 0.55;
+        player.vy = JUMP_FORCE * STOMP_BOUNCE;
         spawnBurst(en.x - camX + en.w / 2, en.y, '150, 100, 60');
-      } else if (player.invuln <= 0) {
-        const knockDir = (player.x + player.w / 2 < en.x + en.w / 2) ? -1 : 1;
+        SFX.stomp();
+      } else if (!lifeLostThisFrame && player.invuln <= 0) {
         if (player.big) {
+          const knockDir = (player.x + player.w / 2 < en.x + en.w / 2) ? -1 : 1;
           shrinkPlayer(player);
-          player.invuln = 90;
-          player.vx = knockDir * 6;
-          player.vy = -6;
+          player.invuln = INVULN_FRAMES;
+          player.vx = knockDir * KNOCKBACK_VX;
+          player.vy = KNOCKBACK_VY;
+          SFX.hurt();
         } else {
+          // loseLife() already teleports the player back to the spawn point,
+          // so no knockback velocity is applied here (it would just launch
+          // the freshly-respawned player from an unrelated location).
           loseLife();
-          player.invuln = 90;
-          player.vx = knockDir * 6;
-          player.vy = -6;
         }
       }
     }
   }
 
   // Goal check
-  if (rectsOverlap(player, goal)) {
+  if (gameState === 'playing' && rectsOverlap(player, goal)) {
     winGame();
   }
 
@@ -499,21 +975,36 @@ function update() {
 }
 
 function loseLife() {
-  player.lives--;
+  lifeLostThisFrame = true;
+  player.lives = Math.max(0, player.lives - 1);
   livesEl.textContent = player.lives;
   if (player.lives <= 0) {
     gameState = 'dead';
-    showMessage('GAME OVER', 'You ran out of lives. Stars collected: ' + player.starsCollected + '/' + stars.length);
+    stopTimer();
+    stopMusic();
+    SFX.gameOver();
+    showMessage('GAME OVER', 'You ran out of lives. Stars collected: ' + player.starsCollected + '/' + stars.length + ' · Time: ' + formatTime(elapsedMs));
+    announce('Game over. You ran out of lives.');
   } else {
     resetPlayerPosition(player);
     shrinkPlayer(player);
-    player.invuln = 90;
+    player.invuln = INVULN_FRAMES;
+    SFX.lifeLost();
+    announce('You lost a life. ' + player.lives + ' lives remaining.');
   }
 }
 
 function winGame() {
   gameState = 'won';
-  showMessage('YOU WIN!', 'You reached the flag with ' + player.starsCollected + '/' + stars.length + ' stars.');
+  stopTimer();
+  stopMusic();
+  const rating = ratingForStars(player.starsCollected, stars.length);
+  const isNew = saveBestIfBetter(player.starsCollected, elapsedMs);
+  showMessage(rating.emoji + ' ' + rating.label,
+    'You reached the flag with ' + player.starsCollected + '/' + stars.length + ' stars · Time: ' + formatTime(elapsedMs) + (isNew ? ' · New Best!' : ''));
+  SFX.win();
+  announce('You reached the flag. ' + rating.label);
+  refreshBestLine();
 }
 
 function showMessage(title, body) {
@@ -526,6 +1017,8 @@ function hideMessage() {
 }
 
 function restart() {
+  checkpoints.forEach(cp => cp.reached = false);
+  spawnPoint = { x: 40, y: 300 };
   player = createPlayer();
   stars.forEach(s => s.taken = false);
   mushrooms.forEach(m => m.taken = false);
@@ -534,9 +1027,16 @@ function restart() {
   livesEl.textContent = player.lives;
   particles = [];
   jumpKeyWasDown = false;
+  lifeLostThisFrame = false;
   gameState = 'playing';
   titleOverlay.classList.remove('visible');
   hideMessage();
+  hideToast();
+  ensureAudio();
+  resetTimer();
+  startTimer();
+  startMusic();
+  announce('Game restarted.');
 }
 
 function drawSky() {
@@ -570,6 +1070,7 @@ function drawSun() {
 }
 
 function drawBirds(t) {
+  if (settings.reducedMotion) return;
   ctx.strokeStyle = 'rgba(60, 70, 90, 0.5)';
   ctx.lineWidth = 2;
   for (let i = 0; i < 4; i++) {
@@ -735,8 +1236,8 @@ function drawPlatforms() {
       // foreground bushes every so often
       if (p.w > 90) drawBush(drawX + p.w / 2 - 13, p.y);
     } else {
-      // floating wooden plank platform
-      ctx.fillStyle = '#a9773c';
+      // floating wooden plank platform (also used for the moving platform)
+      ctx.fillStyle = p.moving ? '#b8863f' : '#a9773c';
       ctx.fillRect(drawX, p.y, p.w, p.h);
       ctx.strokeStyle = 'rgba(0,0,0,0.2)';
       ctx.lineWidth = 1;
@@ -761,12 +1262,28 @@ function drawPlatforms() {
   }
 }
 
+function drawCheckpoints() {
+  for (const cp of checkpoints) {
+    const drawX = cp.x - camX;
+    if (drawX + cp.w < -20 || drawX > canvas.width + 20) continue;
+    ctx.fillStyle = '#cfd8e3';
+    ctx.fillRect(drawX + cp.w / 2 - 2, cp.y, 4, cp.h);
+    ctx.fillStyle = cp.reached ? '#3fbf5c' : '#9aa5b1';
+    ctx.beginPath();
+    ctx.moveTo(drawX + cp.w / 2 + 2, cp.y + 4);
+    ctx.lineTo(drawX + cp.w / 2 + 24, cp.y + 12);
+    ctx.lineTo(drawX + cp.w / 2 + 2, cp.y + 20);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
 function drawStar(x, y, taken, t) {
   if (taken) return;
   const drawX = x - camX;
   if (drawX < -30 || drawX > canvas.width + 30) return;
-  const bob = Math.sin(t / 300 + x) * 4;
-  const scale = 1 + Math.sin(t / 200 + x) * 0.12;
+  const bob = settings.reducedMotion ? 0 : Math.sin(t / 300 + x) * 4;
+  const scale = settings.reducedMotion ? 1 : 1 + Math.sin(t / 200 + x) * 0.12;
   ctx.save();
   ctx.translate(drawX, y + bob);
   ctx.scale(scale, scale);
@@ -825,11 +1342,33 @@ function drawMushroom(x, y, taken) {
   ctx.restore();
 }
 
+function drawFlyer(en, drawX) {
+  ctx.save();
+  ctx.translate(drawX + en.w / 2, en.y + en.h / 2);
+  const flap = settings.reducedMotion ? 0 : Math.sin(Date.now() / 80) * 6;
+  ctx.fillStyle = '#f2c94c';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, en.w / 2, en.h / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.beginPath();
+  ctx.ellipse(-en.w / 2, -flap, 8, 4, Math.PI / 5, 0, Math.PI * 2);
+  ctx.ellipse(en.w / 2, flap, 8, 4, -Math.PI / 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.arc(-3, -2, 1.6, 0, Math.PI * 2);
+  ctx.arc(3, -2, 1.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawEnemies() {
   for (const en of enemies) {
     if (!en.alive) continue;
     const drawX = en.x - camX;
     if (drawX + en.w < 0 || drawX > canvas.width) continue;
+    if (en.type === 'flyer') { drawFlyer(en, drawX); continue; }
     ctx.save();
     ctx.translate(drawX + en.w / 2, en.y + en.h / 2);
     // body
@@ -874,7 +1413,7 @@ function drawGoalFlag() {
   ctx.fillStyle = '#ffe066';
   ctx.fill();
   ctx.fillStyle = '#ff3b3b';
-  const wave = Math.sin(Date.now() / 250) * 4;
+  const wave = settings.reducedMotion ? 0 : Math.sin(Date.now() / 250) * 4;
   ctx.beginPath();
   ctx.moveTo(drawX + 4, goal.y - goal.h + 25);
   ctx.quadraticCurveTo(drawX + 20 + wave, goal.y - goal.h + 31, drawX + 34, goal.y - goal.h + 38);
@@ -972,6 +1511,11 @@ function drawHUDVignette() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
+function updateProgressBar() {
+  const progress = Math.max(0, Math.min(1, (player.x - 40) / (goal.x - 40)));
+  progressFill.style.width = (progress * 100) + '%';
+}
+
 function draw() {
   const t = Date.now();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -983,6 +1527,7 @@ function draw() {
   drawBackgroundPipes();
   drawCastle();
   drawPlatforms();
+  drawCheckpoints();
   stars.forEach(s => drawStar(s.x, s.y, s.taken, t));
   mushrooms.forEach(m => drawMushroom(m.x, m.y, m.taken));
   drawEnemies();
@@ -990,6 +1535,8 @@ function draw() {
   if (player.invuln <= 0 || Math.floor(t / 80) % 2 === 0) drawPlayer();
   drawParticles();
   drawHUDVignette();
+  updateTimerDisplay();
+  updateProgressBar();
 }
 
 function loop() {
@@ -997,6 +1544,9 @@ function loop() {
   draw();
   requestAnimationFrame(loop);
 }
+
+applySettingsToUI();
+refreshBestLine();
 loop();
 </script>
 </body>
